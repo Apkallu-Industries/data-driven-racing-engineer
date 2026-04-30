@@ -712,6 +712,37 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             <option value="RPM">RPM</option>
             <option value="Gear">Gear</option>
           </select>
+          <div className="flex items-center gap-px overflow-hidden rounded-sm border border-border">
+            <button
+              onClick={() => setShowSectorHeat(!showSectorHeat)}
+              className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase ${
+                showSectorHeat ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Sector heatmap: gain / loss vs fastest sector"
+            >
+              <Flame className="h-3 w-3" /> Heat
+            </button>
+            <button
+              onClick={() => setShowTrackBands(!showTrackBands)}
+              disabled={mapMode !== "averaged"}
+              className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase disabled:opacity-40 ${
+                showTrackBands ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Track-width bands estimated from lap-to-lap spread (averaged mode)"
+            >
+              <Waves className="h-3 w-3" /> Band
+            </button>
+            <button
+              onClick={() => setShowDeviation(!showDeviation)}
+              disabled={mapMode !== "averaged"}
+              className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase disabled:opacity-40 ${
+                showDeviation ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Deviation: average XY distance & heading error vs averaged line"
+            >
+              <GitCompare className="h-3 w-3" /> Dev
+            </button>
+          </div>
           <span className="mr-1 font-mono text-[10px] tabular-nums text-muted-foreground">
             {zoom.toFixed(1)}×
           </span>
@@ -765,9 +796,50 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             />
           )}
           {foreground}
+          {/* Track-width band */}
+          {bandPath && (
+            <path d={bandPath} fill="var(--primary)" fillOpacity={0.08} stroke="var(--primary)" strokeOpacity={0.25} strokeWidth={0.6 / zoom} />
+          )}
+          {/* Sector heatmap line + dividers */}
+          {sectorOverlay && sectorOverlay.segs.map((s) => (
+            <path key={s.sector} d={s.d} fill="none" stroke={s.color} strokeWidth={4 / zoom} strokeLinecap="round" opacity={0.85} />
+          ))}
+          {sectorMarkers && sectorMarkers.map((m, i) => (
+            <g key={i}>
+              <circle cx={m.cx} cy={m.cy} r={3 / zoom} fill="var(--background)" stroke="var(--foreground)" strokeWidth={1 / zoom} />
+              <text x={m.cx + 5 / zoom} y={m.cy - 5 / zoom} fontSize={9 / zoom} fill="var(--foreground)" fontFamily="monospace">{m.label}</text>
+            </g>
+          ))}
+          {/* Deviation overlay */}
+          {deviationOverlay && deviationOverlay.segs.map((s, i) => (
+            <path key={`dev-${i}`} d={s.d} fill="none" stroke={s.color} strokeWidth={2 / zoom} strokeLinecap="round" />
+          ))}
           <circle cx={dotX} cy={dotY} r={5 / zoom} fill="var(--primary)" stroke="white" strokeWidth={1.5 / zoom} />
         </svg>
       </div>
+      {/* Sector heatmap legend */}
+      {sectorOverlay && (
+        <div className="hairline-t flex items-center gap-3 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span>Sectors Δ</span>
+          {sectorOverlay.deltas.map((d, i) => (
+            <span key={i} className="tabular-nums" style={{ color: d == null ? undefined : diffColor(Math.max(-1, Math.min(1, d / 0.5))) }}>
+              S{i + 1} {d == null ? "—" : (d >= 0 ? "+" : "") + d.toFixed(3) + "s"}
+            </span>
+          ))}
+          <span className="ml-auto text-[9px]">vs best sector</span>
+        </div>
+      )}
+      {/* Deviation legend */}
+      {deviationOverlay && (
+        <div className="hairline-t flex items-center gap-3 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span>Dev avg</span>
+          <span className="tabular-nums">{deviationOverlay.meanDev.toFixed(2)} m</span>
+          <span>· max</span>
+          <span className="tabular-nums">{deviationOverlay.maxDev.toFixed(2)} m</span>
+          <span>· heading</span>
+          <span className="tabular-nums">{deviationOverlay.meanHeadDeg.toFixed(2)}°</span>
+        </div>
+      )}
       {/* Color-channel legend */}
       {mapColorBy !== "none" && built.kind !== "drift" && colorChannel && (
         <div className="hairline-t flex items-center gap-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
