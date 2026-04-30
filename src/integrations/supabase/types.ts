@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      telemetry_sessions: {
+        Row: {
+          best_lap_s: number | null
+          car: string | null
+          created_at: string
+          driver: string | null
+          duration_s: number | null
+          file_size: number | null
+          id: string
+          lap_count: number | null
+          name: string
+          num_vars: number | null
+          recorded_at: string | null
+          storage_path: string
+          tick_rate: number | null
+          track: string | null
+          user_id: string
+        }
+        Insert: {
+          best_lap_s?: number | null
+          car?: string | null
+          created_at?: string
+          driver?: string | null
+          duration_s?: number | null
+          file_size?: number | null
+          id?: string
+          lap_count?: number | null
+          name: string
+          num_vars?: number | null
+          recorded_at?: string | null
+          storage_path: string
+          tick_rate?: number | null
+          track?: string | null
+          user_id: string
+        }
+        Update: {
+          best_lap_s?: number | null
+          car?: string | null
+          created_at?: string
+          driver?: string | null
+          duration_s?: number | null
+          file_size?: number | null
+          id?: string
+          lap_count?: number | null
+          name?: string
+          num_vars?: number | null
+          recorded_at?: string | null
+          storage_path?: string
+          tick_rate?: number | null
+          track?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
