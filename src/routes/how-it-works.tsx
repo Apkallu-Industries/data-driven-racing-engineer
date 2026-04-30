@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Activity, Upload, Cpu, LineChart, MapPin, Layers, GitCompare, Lock, Gauge, FileBinary, Workflow } from "lucide-react";
+import { Activity, Upload, Cpu, LineChart, MapPin, Layers, GitCompare, Lock, Gauge, FileCode, Workflow } from "lucide-react";
 
 export const Route = createFileRoute("/how-it-works")({
   head: () => ({
@@ -68,7 +68,7 @@ function HowItWorksPage() {
         <ol className="mt-12 grid gap-px overflow-hidden rounded-sm bg-border md:grid-cols-5">
           {[
             { n: "01", icon: Upload, h: "Upload", p: "Drop the .ibt into your account. The file is stored privately, scoped to your user via row-level security." },
-            { n: "02", icon: FileBinary, h: "Decode header", p: "Read the IRSDK header, variable headers and embedded session YAML. Detect tick rate, duration, car and track." },
+            { n: "02", icon: FileCode, h: "Decode header", p: "Read the IRSDK header, variable headers and embedded session YAML. Detect tick rate, duration, car and track." },
             { n: "03", icon: Cpu, h: "Stream samples", p: "A Web Worker walks every tick record, decoding 250+ channels into Float32Arrays without freezing the UI." },
             { n: "04", icon: Workflow, h: "Reconstruct", p: "Detect lap boundaries from the Lap channel and integrate VelocityX/Y + Yaw to rebuild the track outline." },
             { n: "05", icon: LineChart, h: "Render", p: "uPlot draws synchronized stacked traces with a sub-frame cursor shared across charts, map and gauges." },
