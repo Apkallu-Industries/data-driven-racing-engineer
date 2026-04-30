@@ -543,6 +543,135 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
 
   const colorChannel = mapColorBy !== "none" ? parsed.channels[mapColorBy] : undefined;
 
+  // ---------- Overlays ----------
+  // Sector heatmap: per-sector, color the reference racing line by gain/loss vs
+  // the fastest sector across all valid laps (in seconds).
+  const sectorOverlay = useMemo(() => {
+    if (!showSectorHeat || built.kind === "drift" || !projection) return null;
+    const lapsForSec =
+      built.kind === "averaged" ? built.laps : (built as { laps: BuiltLap[] }).laps;
+    if (!lapsForSec || lapsForSec.length === 0) return null;
+    const allTimes: (number | null)[][] = lapsForSec.map(lapSectorTimes);
+    const best: number[] = new Array(NUM_SECTORS).fill(Infinity);
+    for (const ts of allTimes) {
+      for (let s = 0; s < NUM_SECTORS; s++) {
+        const v = ts[s];
+        if (v != null && isFinite(v) && v > 0 && v < best[s]) best[s] = v;
+      }
+    }
+    // Pick the lap whose path we draw the heatmap on.
+    const refLapBuilt =
+      built.kind === "averaged"
+        ? null
+        : (built as { laps: BuiltLap[] }).laps.find((l) => l.lap === refLap) ??
+          (built as { laps: BuiltLap[] }).laps[0];
+    const path = built.kind === "averaged" ? built.avg : refLapBuilt!;
+    const refTimes = built.kind === "averaged"
+      ? best // averaged path "is" the best per-sector reference
+      : lapSectorTimes(refLapBuilt!);
+
+    // Build per-sector deltas vs best (seconds). Positive = loss, negative = gain (== 0 if best).
+    const deltas: (number | null)[] = refTimes.map((t, i) =>
+      t == null || !isFinite(best[i]) ? null : t - best[i],
+    );
+    // Normalize for color: clamp to ±0.5s typical
+    const NORM = 0.5;
+    const n = path.x.length;
+    const segs: { d: string; color: string; sector: number }[] = [];
+    for (let s = 0; s < NUM_SECTORS; s++) {
+      const i0 = Math.floor((s * n) / NUM_SECTORS);
+      const i1 = Math.floor(((s + 1) * n) / NUM_SECTORS);
+      const d_ = deltas[s];
+      if (d_ == null) continue;
+      const t = Math.max(-1, Math.min(1, d_ / NORM));
+      let d = `M ${projection.px(path.x[i0])} ${projection.py(path.y[i0])}`;
+      for (let i = i0 + 1; i < i1; i++) {
+        d += ` L ${projection.px(path.x[i])} ${projection.py(path.y[i])}`;
+      }
+      segs.push({ d, color: diffColor(t), sector: s });
+    }
+    return { segs, deltas, best };
+  }, [showSectorHeat, built, projection, refLap]);
+
+  // Track width bands: only meaningful in averaged mode (uses spread/perp σ).
+  const bandPath = useMemo(() => {
+    if (!showTrackBands || built.kind !== "averaged" || !projection) return null;
+    const { avg } = built;
+    const n = avg.x.length;
+    const innerL: { x: number; y: number }[] = [];
+    const outerR: { x: number; y: number }[] = [];
+    const SIGMAS = 1.2; // ~80% containment
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const tx = avg.x[j] - avg.x[i];
+      const ty = avg.y[j] - avg.y[i];
+      const len = Math.hypot(tx, ty) || 1;
+      const nx = -ty / len;
+      const ny = tx / len;
+      const off = avg.spread[i] * SIGMAS;
+      innerL.push({ x: avg.x[i] + nx * off, y: avg.y[i] + ny * off });
+      outerR.push({ x: avg.x[i] - nx * off, y: avg.y[i] - ny * off });
+    }
+    let d = `M ${projection.px(innerL[0].x)} ${projection.py(innerL[0].y)}`;
+    for (let i = 1; i < n; i++) d += ` L ${projection.px(innerL[i].x)} ${projection.py(innerL[i].y)}`;
+    for (let i = n - 1; i >= 0; i--) d += ` L ${projection.px(outerR[i].x)} ${projection.py(outerR[i].y)}`;
+    d += " Z";
+    return d;
+  }, [showTrackBands, built, projection]);
+
+  // Deviation overlay: average XY distance and heading error from each lap to
+  // the averaged line (averaged mode only). Color the centerline by deviation.
+  const deviationOverlay = useMemo(() => {
+    if (!showDeviation || built.kind !== "averaged" || !projection) return null;
+    const { avg } = built;
+    const n = avg.x.length;
+    let maxDev = 0;
+    for (let i = 0; i < n; i++) if (avg.meanDev[i] > maxDev) maxDev = avg.meanDev[i];
+    const NORM = Math.max(0.5, maxDev);
+    const segs: { d: string; color: string }[] = [];
+    const step = Math.max(1, Math.floor(n / 250));
+    for (let i = 0; i < n - step; i += step) {
+      const t = avg.meanDev[i] / NORM; // 0..1
+      // Light grey -> magenta to highlight high-deviation zones
+      const color = `oklch(${0.7 - t * 0.2} ${0.05 + t * 0.25} 330)`;
+      const d = `M ${projection.px(avg.x[i])} ${projection.py(avg.y[i])} L ${projection.px(avg.x[i + step])} ${projection.py(avg.y[i + step])}`;
+      segs.push({ d, color });
+    }
+    // Aggregate stats
+    let sumDev = 0, sumHead = 0;
+    for (let i = 0; i < n; i++) {
+      sumDev += avg.meanDev[i];
+      sumHead += avg.meanHead[i];
+    }
+    return {
+      segs,
+      meanDev: sumDev / n,
+      meanHeadDeg: (sumHead / n) * (180 / Math.PI),
+      maxDev,
+    };
+  }, [showDeviation, built, projection]);
+
+  // Sector boundary positions on the reference path (for the heatmap dividers).
+  const sectorMarkers = useMemo(() => {
+    if (!showSectorHeat || built.kind === "drift" || !projection) return null;
+    const path =
+      built.kind === "averaged"
+        ? built.avg
+        : ((built as { laps: BuiltLap[] }).laps.find((l) => l.lap === refLap) ??
+            (built as { laps: BuiltLap[] }).laps[0]);
+    const n = path.x.length;
+    const marks: { cx: number; cy: number; label: string }[] = [];
+    for (let s = 0; s < NUM_SECTORS; s++) {
+      const i = Math.floor((s * n) / NUM_SECTORS);
+      marks.push({
+        cx: projection.px(path.x[i]),
+        cy: projection.py(path.y[i]),
+        label: `S${s + 1}`,
+      });
+    }
+    return marks;
+  }, [showSectorHeat, built, projection, refLap]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b flex flex-wrap items-center justify-between gap-2 px-3 py-1.5">
