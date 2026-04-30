@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Activity } from "lucide-react";
+import { useState } from "react";
+import { Activity, CheckCircle2, Circle, LogOut, Mail, Chrome, Apple, KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -17,15 +17,11 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, session, loading, signOut } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!loading && user) navigate({ to: "/sessions" });
-  }, [user, loading, navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +46,21 @@ function AuthPage() {
     }
   };
 
+  // Derive provider info from the Supabase user object
+  const provider = (user?.app_metadata?.provider as string | undefined) ?? "email";
+  const allProviders = (user?.app_metadata?.providers as string[] | undefined) ?? [provider];
+  const identities = user?.identities ?? [];
+  const lastSignInAt = user?.last_sign_in_at;
+
+  const providerLabel = (p: string) =>
+    p === "google" ? "Google" : p === "apple" ? "Apple" : p === "email" ? "Email + password" : p;
+  const providerIcon = (p: string) => {
+    if (p === "google") return Chrome;
+    if (p === "apple") return Apple;
+    if (p === "email") return Mail;
+    return KeyRound;
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm">
@@ -59,6 +70,106 @@ function AuthPage() {
           </div>
           <span className="font-mono text-sm tracking-wider">APEXTRACE</span>
         </Link>
+
+        {/* Auth status panel */}
+        <div className="hairline mb-4 rounded-sm bg-panel p-4">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              Status
+            </span>
+            <span
+              className={`flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider ${
+                loading
+                  ? "text-muted-foreground"
+                  : user
+                    ? "text-primary"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Circle className="h-3 w-3 animate-pulse" />
+                  Checking…
+                </>
+              ) : user ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Signed in
+                </>
+              ) : (
+                <>
+                  <Circle className="h-3 w-3" />
+                  Signed out
+                </>
+              )}
+            </span>
+          </div>
+
+          {user ? (
+            <div className="mt-3 space-y-2 text-xs">
+              <Row label="Account" value={user.email ?? user.id} />
+              <Row
+                label="Provider"
+                value={
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {allProviders.map((p) => {
+                      const Icon = providerIcon(p);
+                      return (
+                        <span
+                          key={p}
+                          className="inline-flex items-center gap-1 rounded-sm border border-border bg-rail px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+                        >
+                          <Icon className="h-3 w-3" />
+                          {providerLabel(p)}
+                        </span>
+                      );
+                    })}
+                  </span>
+                }
+              />
+              {identities.length > 1 && (
+                <Row
+                  label="Linked"
+                  value={`${identities.length} identities`}
+                />
+              )}
+              {lastSignInAt && (
+                <Row
+                  label="Last sign-in"
+                  value={new Date(lastSignInAt).toLocaleString()}
+                />
+              )}
+              {session?.expires_at && (
+                <Row
+                  label="Session ends"
+                  value={new Date(session.expires_at * 1000).toLocaleString()}
+                />
+              )}
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => navigate({ to: "/sessions" })}
+                  className="flex-1 rounded-sm bg-primary py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Open workbench →
+                </button>
+                <button
+                  onClick={async () => {
+                    await signOut();
+                    toast.success("Signed out");
+                  }}
+                  className="flex items-center gap-1 rounded-sm border border-border-strong px-2 py-1.5 text-[11px] hover:bg-accent"
+                >
+                  <LogOut className="h-3 w-3" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">
+              You're not signed in. Use the form below to access your telemetry library.
+            </p>
+          )}
+        </div>
 
         <div className="hairline rounded-sm bg-panel p-6">
           <h1 className="text-xl font-semibold">{mode === "signin" ? "Sign in" : "Create account"}</h1>
@@ -107,6 +218,17 @@ function AuthPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span className="text-right text-foreground">{value}</span>
     </div>
   );
 }
