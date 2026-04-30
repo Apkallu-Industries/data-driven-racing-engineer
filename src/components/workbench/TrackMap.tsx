@@ -245,6 +245,12 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
     mapColorBy,
     setMapMode,
     setMapColorBy,
+    showSectorHeat,
+    showTrackBands,
+    showDeviation,
+    setShowSectorHeat,
+    setShowTrackBands,
+    setShowDeviation,
   } = useWorkbench();
 
   const [zoom, setZoom] = useState(1);
@@ -288,6 +294,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
       return {
         kind: "averaged" as const,
         avg,
+        laps: lapsBuilt.laps,
         bounds: { minX, maxX, minY, maxY },
         cMin: lapsBuilt.cMin,
         cMax: lapsBuilt.cMax,
