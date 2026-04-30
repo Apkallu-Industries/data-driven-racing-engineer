@@ -52,8 +52,12 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
       <div className="hairline-b px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         Track · {parsed.meta.trackDisplayName ?? parsed.meta.trackName ?? ""}
       </div>
-      <div className="flex-1 p-2">
-        <svg viewBox={`0 0 ${path.w} ${path.h}`} className="h-full w-full">
+      <div className="min-h-0 flex-1 overflow-hidden p-2">
+        <svg
+          viewBox={`0 0 ${path.w} ${path.h}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="block h-full w-full"
+        >
           <path d={path.d} fill="none" stroke="var(--border-strong)" strokeWidth={1} opacity={0.5} />
           {path.refPath && <path d={path.refPath} fill="none" stroke="var(--ch-speed)" strokeWidth={1.5} />}
           {path.cmpPath && <path d={path.cmpPath} fill="none" stroke="var(--ch-throttle)" strokeWidth={1.5} strokeDasharray="3,3" />}
