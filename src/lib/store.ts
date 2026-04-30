@@ -46,6 +46,13 @@ interface WorkbenchState {
   mapColorBy: MapColorChannel;
   setMapMode: (m: MapMode) => void;
   setMapColorBy: (c: MapColorChannel) => void;
+
+  showSectorHeat: boolean;
+  showTrackBands: boolean;
+  showDeviation: boolean;
+  setShowSectorHeat: (v: boolean) => void;
+  setShowTrackBands: (v: boolean) => void;
+  setShowDeviation: (v: boolean) => void;
 }
 
 export const useWorkbench = create<WorkbenchState>((set) => ({
@@ -84,4 +91,11 @@ export const useWorkbench = create<WorkbenchState>((set) => ({
   mapColorBy: "Throttle",
   setMapMode: (m) => set({ mapMode: m }),
   setMapColorBy: (c) => set({ mapColorBy: c }),
+
+  showSectorHeat: false,
+  showTrackBands: false,
+  showDeviation: false,
+  setShowSectorHeat: (v) => set({ showSectorHeat: v }),
+  setShowTrackBands: (v) => set({ showTrackBands: v }),
+  setShowDeviation: (v) => set({ showDeviation: v }),
 }));
