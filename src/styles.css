@@ -62,74 +62,77 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* MoTeC i2 Pro dark workspace tokens (single dark theme) */
+  --radius: 0.25rem;
+
+  --background: oklch(0.18 0.005 250);     /* #1a1d21 */
+  --foreground: oklch(0.92 0.005 250);
+
+  --panel: oklch(0.21 0.006 250);          /* #22262b */
+  --panel-2: oklch(0.235 0.006 250);
+  --rail: oklch(0.16 0.005 250);
+
+  --card: var(--panel);
+  --card-foreground: var(--foreground);
+  --popover: var(--panel-2);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(0.78 0.16 195);         /* cyan accent */
+  --primary-foreground: oklch(0.15 0.01 250);
+
+  --secondary: oklch(0.27 0.008 250);
+  --secondary-foreground: oklch(0.92 0.005 250);
+
+  --muted: oklch(0.24 0.006 250);
+  --muted-foreground: oklch(0.62 0.01 250);
+
+  --accent: oklch(0.3 0.012 250);
+  --accent-foreground: oklch(0.95 0.005 250);
+
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.28 0.006 250);          /* #2f343a */
+  --border-strong: oklch(0.36 0.008 250);
+  --input: oklch(0.28 0.006 250);
+  --ring: oklch(0.78 0.16 195);
+
+  /* Channel trace colors (MoTeC convention) */
+  --ch-speed:    oklch(0.78 0.16 195);     /* cyan   */
+  --ch-throttle: oklch(0.78 0.20 145);     /* green  */
+  --ch-brake:    oklch(0.66 0.24 28);      /* red    */
+  --ch-rpm:      oklch(0.86 0.18 95);      /* amber  */
+  --ch-gear:     oklch(0.92 0.005 250);    /* white  */
+  --ch-steer:    oklch(0.7  0.22 320);     /* magenta*/
+  --ch-glat:     oklch(0.76 0.18 50);      /* orange */
+  --ch-glong:    oklch(0.72 0.18 260);     /* blue   */
+  --ch-default:  oklch(0.72 0.05 250);
+
+  --grid-major: oklch(0.32 0.006 250);
+  --grid-minor: oklch(0.24 0.006 250);
+
+  --chart-1: var(--ch-speed);
+  --chart-2: var(--ch-throttle);
+  --chart-3: var(--ch-brake);
+  --chart-4: var(--ch-rpm);
+  --chart-5: var(--ch-steer);
+
+  --sidebar: var(--rail);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  /* App is always dark; .dark inherits from :root */
+  color-scheme: dark;
 }
 
 @layer base {
@@ -140,5 +143,41 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
   }
+
+  html { color-scheme: dark; }
+
+  .font-mono, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .panel       { background-color: var(--panel); }
+  .panel-2     { background-color: var(--panel-2); }
+  .rail        { background-color: var(--rail); }
+  .hairline    { border: 1px solid var(--border); }
+  .hairline-b  { border-bottom: 1px solid var(--border); }
+  .hairline-t  { border-top: 1px solid var(--border); }
+  .hairline-r  { border-right: 1px solid var(--border); }
+  .hairline-l  { border-left: 1px solid var(--border); }
+}
+
+@theme inline {
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-rail: var(--rail);
+  --color-border-strong: var(--border-strong);
+  --color-ch-speed: var(--ch-speed);
+  --color-ch-throttle: var(--ch-throttle);
+  --color-ch-brake: var(--ch-brake);
+  --color-ch-rpm: var(--ch-rpm);
+  --color-ch-gear: var(--ch-gear);
+  --color-ch-steer: var(--ch-steer);
+  --color-ch-glat: var(--ch-glat);
+  --color-ch-glong: var(--ch-glong);
+  --color-ch-default: var(--ch-default);
+  --color-grid-major: var(--grid-major);
+  --color-grid-minor: var(--grid-minor);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
