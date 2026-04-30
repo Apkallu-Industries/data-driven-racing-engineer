@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState, useCallback } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench, type MapMode, type MapColorChannel } from "@/lib/store";
-import { Plus, Minus, Maximize2 } from "lucide-react";
+import { Plus, Minus, Maximize2, Flame, Waves, GitCompare } from "lucide-react";
 
 const W = 400;
 const H = 260;
 const PAD = 16;
 const NUM_SAMPLES = 600; // resampling resolution per lap (in % of lap distance)
+const NUM_SECTORS = 3;
 
 interface BuiltLap {
   /** XY in world units, one point per resample bin */
@@ -15,6 +16,10 @@ interface BuiltLap {
   /** Channel value per bin (used for color). Empty if no channel. */
   c: Float32Array;
   lap: number;
+  /** Lap time in seconds (for sector timing on the heatmap). */
+  timeS: number;
+  /** Session-time offset per bin, used to derive sector splits. */
+  st: Float32Array;
 }
 
 /** Build per-lap resampled XY using LapDistPct as the abscissa. */
@@ -28,6 +33,7 @@ function buildLapsByDist(
 
   const channelData =
     channelName !== "none" ? parsed.channels[channelName]?.data : undefined;
+  const sessionTime = parsed.channels["SessionTime"]?.data;
 
   const laps: BuiltLap[] = [];
   let cMin = Infinity;
@@ -38,6 +44,7 @@ function buildLapsByDist(
     const x = new Float32Array(NUM_SAMPLES);
     const y = new Float32Array(NUM_SAMPLES);
     const c = new Float32Array(channelData ? NUM_SAMPLES : 0);
+    const st = new Float32Array(sessionTime ? NUM_SAMPLES : 0);
 
     // Build a monotonic-ish list of (pct, tick) for this lap.
     // Filter out the wrap from ~1 -> 0 at the line.
@@ -72,6 +79,9 @@ function buildLapsByDist(
         if (v < cMin) cMin = v;
         if (v > cMax) cMax = v;
       }
+      if (sessionTime) {
+        st[i] = sessionTime[t0] * (1 - ff) + sessionTime[t1] * ff;
+      }
     }
 
     // Re-anchor each lap so it starts at (0,0). Cheap drift cleanup that
@@ -82,7 +92,7 @@ function buildLapsByDist(
       y[i] -= y0;
     }
 
-    laps.push({ x, y, c, lap: lap.lap });
+    laps.push({ x, y, c, lap: lap.lap, timeS: lap.timeS, st });
   }
 
   if (!isFinite(cMin)) cMin = 0;
@@ -108,7 +118,17 @@ function closeLoop(x: Float32Array, y: Float32Array): { x: Float32Array; y: Floa
 }
 
 /** Average the per-bin XY across all laps (after each lap is closed). */
-function averageLaps(laps: BuiltLap[]): { x: Float32Array; y: Float32Array; c: Float32Array } | null {
+function averageLaps(laps: BuiltLap[]): {
+  x: Float32Array;
+  y: Float32Array;
+  c: Float32Array;
+  /** Per-bin std-dev of perpendicular offset across laps (in world units). */
+  spread: Float32Array;
+  /** Per-bin mean perpendicular distance from average (|deviation|). */
+  meanDev: Float32Array;
+  /** Per-bin mean heading error in radians vs the averaged tangent. */
+  meanHead: Float32Array;
+} | null {
   if (laps.length === 0) return null;
   const n = laps[0].x.length;
   const ax = new Float32Array(n);
@@ -116,8 +136,11 @@ function averageLaps(laps: BuiltLap[]): { x: Float32Array; y: Float32Array; c: F
   const ac = new Float32Array(n);
   const hasC = laps[0].c.length === n;
   let count = 0;
+  // First pass: averaged centerline.
+  const closedLaps: { x: Float32Array; y: Float32Array }[] = [];
   for (const lap of laps) {
     const closed = closeLoop(lap.x, lap.y);
+    closedLaps.push(closed);
     for (let i = 0; i < n; i++) {
       ax[i] += closed.x[i];
       ay[i] += closed.y[i];
@@ -130,7 +153,65 @@ function averageLaps(laps: BuiltLap[]): { x: Float32Array; y: Float32Array; c: F
     ay[i] /= count;
     if (hasC) ac[i] /= count;
   }
-  return { x: ax, y: ay, c: ac };
+
+  // Second pass: per-bin perpendicular spread & heading error vs the avg tangent.
+  const spread = new Float32Array(n);
+  const meanDev = new Float32Array(n);
+  const meanHead = new Float32Array(n);
+  // Pre-compute averaged tangent angle per bin (with wrap).
+  const avgAng = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    avgAng[i] = Math.atan2(ay[j] - ay[i], ax[j] - ax[i]);
+  }
+  for (let i = 0; i < n; i++) {
+    let sumSq = 0;
+    let sumAbs = 0;
+    let sumHead = 0;
+    const tx = Math.cos(avgAng[i]);
+    const ty = Math.sin(avgAng[i]);
+    // Perpendicular axis (left-hand normal): (-ty, tx)
+    for (let k = 0; k < closedLaps.length; k++) {
+      const lx = closedLaps[k].x[i] - ax[i];
+      const ly = closedLaps[k].y[i] - ay[i];
+      const perp = lx * -ty + ly * tx;
+      sumSq += perp * perp;
+      sumAbs += Math.abs(perp);
+      const j = (i + 1) % n;
+      const ang = Math.atan2(closedLaps[k].y[j] - closedLaps[k].y[i], closedLaps[k].x[j] - closedLaps[k].x[i]);
+      let dh = ang - avgAng[i];
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      sumHead += Math.abs(dh);
+    }
+    spread[i] = Math.sqrt(sumSq / closedLaps.length);
+    meanDev[i] = sumAbs / closedLaps.length;
+    meanHead[i] = sumHead / closedLaps.length;
+  }
+  return { x: ax, y: ay, c: ac, spread, meanDev, meanHead };
+}
+
+/** Compute per-sector times for one lap using LapDistPct boundaries (1/3, 2/3). */
+function lapSectorTimes(lap: BuiltLap): (number | null)[] {
+  if (lap.st.length !== lap.x.length) return [null, null, null];
+  const n = lap.st.length;
+  const t0 = lap.st[0];
+  const tMid1 = lap.st[Math.floor(n / 3)];
+  const tMid2 = lap.st[Math.floor((2 * n) / 3)];
+  const tEnd = lap.st[n - 1];
+  return [tMid1 - t0, tMid2 - tMid1, tEnd - tMid2];
+}
+
+/** Diverging color: green (gain) ↔ grey (par) ↔ red (loss). t in [-1,1]. */
+function diffColor(t: number): string {
+  const c = Math.max(-1, Math.min(1, t));
+  if (c >= 0) {
+    // Par (neutral) -> red
+    return `oklch(${0.55 - c * 0.1} ${0.04 + c * 0.2} ${30})`;
+  }
+  // Par (neutral) -> green
+  const m = -c;
+  return `oklch(${0.55 + m * 0.1} ${0.04 + m * 0.2} ${145})`;
 }
 
 /** Map a value in [min,max] to a color along a channel-specific ramp. */
