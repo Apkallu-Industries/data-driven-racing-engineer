@@ -64,12 +64,12 @@ function LandingPage() {
             >
               Open the workbench →
             </Link>
-            <a
-              href="https://docs.lovable.dev"
+            <Link
+              to="/how-it-works"
               className="rounded-sm border border-border-strong px-5 py-3 text-sm hover:bg-accent"
             >
               How it works
-            </a>
+            </Link>
           </div>
         </div>
       </section>
