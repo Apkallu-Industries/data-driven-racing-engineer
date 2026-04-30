@@ -141,7 +141,8 @@ function WorkbenchPage() {
               <div className="min-h-0 flex-1 overflow-hidden">
                 <StackedTraces parsed={parsed} />
               </div>
-              <div className="hairline-t flex h-64 shrink-0">
+              <Timeline parsed={parsed} />
+              <div className="hairline-t flex h-72 shrink-0">
                 <div className="hairline-r w-1/2 bg-panel">
                   <TrackMap parsed={parsed} />
                 </div>
@@ -151,7 +152,6 @@ function WorkbenchPage() {
               </div>
             </div>
           </div>
-          <Timeline parsed={parsed} />
         </>
       )}
     </div>
