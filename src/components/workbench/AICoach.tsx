@@ -62,11 +62,12 @@ export function AICoach({
     try {
       const payload = buildCoachPayload(summary, mode, refLap, cmpLap, detailed);
       const resp = await analyzeTelemetry({ data: { payload, detailed } });
-      if ("error" in resp && resp.error) {
-        setError(resp.error);
-      } else if ("result" in resp) {
-        setResult(resp.result as ConciseResult | DetailedResult);
-        setResultDetailed(resp.detailed);
+      const r = resp as { error?: string; result?: unknown; detailed?: boolean };
+      if (r.error) {
+        setError(r.error);
+      } else if (r.result) {
+        setResult(r.result as ConciseResult | DetailedResult);
+        setResultDetailed(!!r.detailed);
       } else {
         setError("Unexpected response from AI coach.");
       }
