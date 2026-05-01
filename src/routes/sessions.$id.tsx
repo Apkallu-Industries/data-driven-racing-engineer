@@ -11,6 +11,7 @@ import { TrackMap } from "@/components/workbench/TrackMap";
 import { LiveReadout } from "@/components/workbench/LiveReadout";
 import { Timeline } from "@/components/workbench/Timeline";
 import { LapList } from "@/components/workbench/LapList";
+import { AICoach } from "@/components/workbench/AICoach";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -173,6 +174,7 @@ function WorkbenchPage() {
                   </div>
                 </div>
               </div>
+              <AICoach parsed={parsed} track={sess?.track} car={sess?.car} />
             </div>
           </div>
         </>
