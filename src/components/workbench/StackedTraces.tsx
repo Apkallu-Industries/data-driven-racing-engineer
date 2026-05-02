@@ -115,10 +115,17 @@ export function StackedTraces({ parsed }: { parsed: IbtParsed }) {
         },
       };
 
-      // Header label
+      // Header label — build via DOM APIs to avoid HTML injection from .ibt metadata
       const header = document.createElement("div");
       header.className = "flex items-center justify-between px-3 py-1 hairline-b text-[11px] font-mono uppercase tracking-wider";
-      header.innerHTML = `<span style="color:${resolveColor(name)}">${name}</span><span class="text-muted-foreground">${ch.unit || ""} · min ${ch.min.toFixed(2)} · max ${ch.max.toFixed(2)} · avg ${ch.avg.toFixed(2)}</span>`;
+      const nameSpan = document.createElement("span");
+      nameSpan.style.color = resolveColor(name);
+      nameSpan.textContent = name;
+      const statsSpan = document.createElement("span");
+      statsSpan.className = "text-muted-foreground";
+      statsSpan.textContent = `${ch.unit || ""} · min ${ch.min.toFixed(2)} · max ${ch.max.toFixed(2)} · avg ${ch.avg.toFixed(2)}`;
+      header.appendChild(nameSpan);
+      header.appendChild(statsSpan);
       wrap.appendChild(header);
 
       const plotEl = document.createElement("div");
