@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SYSTEM_PROMPT = `You are an expert race driving coach analyzing iRacing telemetry.
 You receive structured per-lap telemetry: per-bin arrays sampled at 60 points along the lap (index 0 = start/finish, 59 = end), speed, throttle (0-1), brake (0-1), gear, RPM, steering, plus detected brake zones and sector splits.
@@ -70,8 +71,14 @@ const SCHEMA_DETAILED = {
 } as const;
 
 export const analyzeTelemetry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { payload: unknown; detailed: boolean }) => data)
   .handler(async ({ data }) => {
+    // Cap payload size to prevent oversized requests draining AI credits
+    const serialized = JSON.stringify(data.payload ?? {});
+    if (serialized.length > 200_000) {
+      return { error: "Telemetry payload too large." } as const;
+    }
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       return { error: "AI coach is not configured (missing LOVABLE_API_KEY)." } as const;
