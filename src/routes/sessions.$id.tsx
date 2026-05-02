@@ -11,6 +11,8 @@ import { TrackMap } from "@/components/workbench/TrackMap";
 import { LiveReadout } from "@/components/workbench/LiveReadout";
 import { Timeline } from "@/components/workbench/Timeline";
 import { LapList } from "@/components/workbench/LapList";
+import { GGDiagram } from "@/components/workbench/GGDiagram";
+import { OptimalLap } from "@/components/workbench/OptimalLap";
 import { AICoach } from "@/components/workbench/AICoach";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -33,7 +35,7 @@ function WorkbenchPage() {
   const [sess, setSess] = useState<Tables<"telemetry_sessions"> | null>(null);
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
-  const [bottomTab, setBottomTab] = useState<"readout" | "laps">("readout");
+  const [bottomTab, setBottomTab] = useState<"readout" | "laps" | "gg" | "optimal">("readout");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -151,7 +153,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps"] as const).map((t) => (
+                    {(["readout", "laps", "gg", "optimal"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -161,16 +163,21 @@ function WorkbenchPage() {
                             : "bg-rail text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        {t === "readout" ? "Readout" : `Laps · ${parsed.laps.length}`}
+                        {t === "readout"
+                          ? "Readout"
+                          : t === "laps"
+                            ? `Laps · ${parsed.laps.length}`
+                            : t === "gg"
+                              ? "g-g"
+                              : "Optimal"}
                       </button>
                     ))}
                   </div>
                   <div className="min-h-0 flex-1">
-                    {bottomTab === "readout" ? (
-                      <LiveReadout parsed={parsed} />
-                    ) : (
-                      <LapList parsed={parsed} />
-                    )}
+                    {bottomTab === "readout" && <LiveReadout parsed={parsed} />}
+                    {bottomTab === "laps" && <LapList parsed={parsed} />}
+                    {bottomTab === "gg" && <GGDiagram parsed={parsed} />}
+                    {bottomTab === "optimal" && <OptimalLap parsed={parsed} />}
                   </div>
                 </div>
               </div>
