@@ -60,6 +60,10 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ApexTrace — iRacing Telemetry Workbench" },
+      { name: "twitter:description", content: "Open and analyze iRacing .ibt telemetry files in a MoTeC-style cinematic workspace." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b2b46417-b498-4810-8fea-f4e0cae33f63" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b2b46417-b498-4810-8fea-f4e0cae33f63" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
