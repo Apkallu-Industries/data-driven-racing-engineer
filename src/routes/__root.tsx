@@ -27,11 +27,31 @@ function NotFoundComponent() {
   );
 }
 
+const CSP = [
+  "default-src 'self'",
+  // TanStack Start injects inline hydration scripts; allow inline + self.
+  "script-src 'self' 'unsafe-inline'",
+  // Tailwind/uPlot use inline style attributes; Google Fonts stylesheet.
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https:",
+  // Supabase REST, Storage, Realtime (wss), plus same-origin server functions.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  // .ibt parser runs in a Web Worker created from a blob URL.
+  "worker-src 'self' blob:",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { httpEquiv: "Content-Security-Policy", content: CSP },
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
       { title: "ApexTrace — iRacing Telemetry Workbench" },
       { name: "description", content: "Open and analyze iRacing .ibt telemetry files in a MoTeC-style cinematic workspace." },
       { name: "author", content: "ApexTrace" },
