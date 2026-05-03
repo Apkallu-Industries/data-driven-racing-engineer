@@ -189,7 +189,7 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
     if (!ref) return null;
 
     const zones = findBrakeZones(brake, lapDistPct, ref);
-    if (zones.length === 0) return { ref, items: [] };
+    if (zones.length === 0) return { ref, items: [], hidden: 0 };
 
     const items = zones
       .map((z, idx) => {
