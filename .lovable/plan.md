@@ -99,6 +99,47 @@ Type codes handled: `1=bool`, `2=int32`, `3=bitfield`, `4=float`, `5=double`, pl
 - Web Worker for parsing; transferable `ArrayBuffer` to keep memory tight
 - Zustand for cursor position / selected channels / lap selection (shared across panes)
 
+## Next-Generation Roadmap
+
+Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay rooted in real measured data — derived/predicted values are fine when stitched from real samples; no fabricated curves.
+
+### Tier 1 — Differentiators
+1. **Physics-derived virtual channels**
+   - ✅ g-g diagram (LatAccel vs LongAccel) with empirical grip envelope (`GGDiagram.tsx`)
+   - ✅ Theoretical optimal lap from best micro-sectors (`OptimalLap.tsx`)
+   - ⬜ Brake bias inference from longitudinal G vs pedal force
+   - ⬜ Slip angle estimate (kinematic bicycle: yaw + speed + steering)
+   - ⬜ Tyre energy / sliding work per corner
+2. **AI Coach v2 — grounded, not hallucinated**
+   - ✅ Counterfactual coach with measured per-zone deltas + confidence scoring (`Counterfactuals.tsx`)
+   - 🟡 Session/compare/single AI summarisation (`AICoach.tsx`) — still bin-summary based
+   - ⬜ Retrieval over user history across sessions ("last 6 races at Spa…")
+   - ⬜ Physics re-integration counterfactual ("brake 5m later → predicted exit Δ")
+   - ⬜ Voice debrief via TTS (ElevenLabs)
+3. **Driver DNA / fingerprint** ⬜
+   - Cluster style across sessions; compare to past self / anonymised community baseline
+
+### Tier 2 — Visualisation
+4. **3D track replay** (Three.js / R3F) ⬜ — elevation-aware, ghost compare car
+5. **Heatmap minimap with time-delta gradient** 🟡 — TrackMap colors by channel; missing thickness=speed + Δt color
+6. **Brake/throttle "piano roll"** ⬜ — MIDI-style stacked pedal bars across N laps
+7. **Sector "spider" radar** ⬜ — per-sector polygon (entry/min/exit speed, brake G, throttle-on, steer smoothness)
+
+### Tier 3 — Platform moat
+8. **Setup-aware analysis** ⬜ — parse iRacing setup export; correlate changes to outcomes
+9. **Live ingest via IRSDK/UDP** ⬜ — companion app → Lovable Cloud → real-time coaching
+10. **Shareable lap links** ⬜ — public read-only "lap card" with TrackMap + key stats
+
+### Recently shipped (supporting)
+- g-g diagram, Optimal Lap, Counterfactual What-if with confidence scoring
+- AI Coach (single/compare/session, brief/detailed toggle)
+- Security hardening: RLS audit fixes, CSP headers
+
+### Suggested next sprint
+1. Physics counterfactual ("brake 5m later → +Δs") on top of existing What-if zones
+2. 3D track replay (R3F) — biggest demo/marketing payoff
+3. Driver DNA fingerprint — retention hook once multi-session history exists
+
 ## Scope for v1
 
 Included: parser, all 5 chosen features (channel browser, track map, lap compare, multi-channel charts, timeline playback), upload + account, full MoTeC dark aesthetic.
