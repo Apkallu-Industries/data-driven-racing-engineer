@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { IbtParsed, IbtLap } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
-import { TrendingDown, TrendingUp, MapPin } from "lucide-react";
+import { TrendingDown, TrendingUp, MapPin, ShieldAlert, ShieldCheck } from "lucide-react";
 
 /**
  * Counterfactual coach. Strictly measured — no physics fabrication.
@@ -30,6 +30,8 @@ interface BandStats {
   apexMinSpeed: number;
   throttleOnPct: number | null; // pct where throttle first crosses 50%
   exitSpeed: number;
+  sampleCount: number;
+  spanPct: number; // actual pct span covered by samples
 }
 
 function findBrakeZones(
@@ -105,6 +107,7 @@ function statsForBand(
   let releasePct: number | null = null;
   let throttleOnPct: number | null = null;
   let exitSpeed = speed[tEnd];
+  let sampleCount = 0;
   for (let t = tStart; t <= tEnd; t++) {
     const s = speed[t];
     if (s < minSpeed) minSpeed = s;
@@ -116,6 +119,7 @@ function statsForBand(
     if (throttleOnPct == null && throttle[t] > 0.5) {
       throttleOnPct = lapDistPct[t];
     }
+    sampleCount++;
   }
   return {
     lap: lap.lap,
@@ -125,6 +129,8 @@ function statsForBand(
     apexMinSpeed: minSpeed === Infinity ? 0 : minSpeed,
     throttleOnPct,
     exitSpeed,
+    sampleCount,
+    spanPct: lapDistPct[tEnd] - lapDistPct[tStart],
   };
 }
 
@@ -132,6 +138,38 @@ function fmtMeters(deltaPct: number, trackLengthKm?: number): string {
   if (!trackLengthKm) return `${(deltaPct * 100).toFixed(2)}%`;
   const m = deltaPct * trackLengthKm * 1000;
   return `${m >= 0 ? "+" : ""}${m.toFixed(1)} m`;
+}
+
+const MIN_CONFIDENCE_SHOW = 0.35;
+const LOW_CONFIDENCE_FLAG = 0.6;
+
+/**
+ * Confidence in [0,1] based on:
+ *  - data density (sample count in both ref and best traversals)
+ *  - span coverage (how completely each lap covered the requested band)
+ *  - magnitude of measured gain vs sample-time noise floor (~1 tick)
+ */
+function computeConfidence(
+  ref: BandStats,
+  best: BandStats,
+  zoneSpanPct: number,
+  gainS: number,
+): { score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  // Density: 60+ samples each side is plenty (~1s @ 60Hz).
+  const density = Math.min(1, Math.min(ref.sampleCount, best.sampleCount) / 60);
+  if (density < 0.5) reasons.push("sparse samples");
+  // Coverage: how much of the requested zone was actually traversed monotonically.
+  const refCov = zoneSpanPct > 0 ? Math.min(1, ref.spanPct / zoneSpanPct) : 0;
+  const bestCov = zoneSpanPct > 0 ? Math.min(1, best.spanPct / zoneSpanPct) : 0;
+  const coverage = Math.min(refCov, bestCov);
+  if (coverage < 0.7) reasons.push("partial band coverage");
+  // Signal vs noise: assume ~16ms tick => need gain comfortably above that.
+  const noiseFloor = 0.02;
+  const signal = Math.min(1, Math.abs(gainS) / (noiseFloor * 5));
+  if (signal < 0.4) reasons.push("gain near noise floor");
+  const score = +(0.4 * density + 0.4 * coverage + 0.2 * signal).toFixed(2);
+  return { score, reasons };
 }
 
 export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
@@ -176,13 +214,23 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
             break;
           }
         }
-        return { idx, zone: z, refStats, best, gainS, jumpTick };
+        const zoneSpanPct = z.windowEndPct - z.startPct;
+        const { score: confidence, reasons } = computeConfidence(
+          refStats,
+          best,
+          zoneSpanPct,
+          gainS,
+        );
+        return { idx, zone: z, refStats, best, gainS, jumpTick, confidence, reasons };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    // Sort by largest measured gain.
-    items.sort((a, b) => b.gainS - a.gainS);
-    return { ref, items };
+    // Drop zones we can't meaningfully report on.
+    const visible = items.filter((i) => i.confidence >= MIN_CONFIDENCE_SHOW);
+    const hidden = items.length - visible.length;
+    // Sort by gain weighted by confidence so flaky zones drop down the list.
+    visible.sort((a, b) => b.gainS * b.confidence - a.gainS * a.confidence);
+    return { ref, items: visible, hidden };
   }, [parsed, refLap]);
 
   if (!analysis) {
@@ -199,13 +247,19 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
     );
   }
 
-  const { ref, items } = analysis;
-  const totalGain = items.filter((i) => i.gainS > 0).reduce((a, b) => a + b.gainS, 0);
+  const { ref, items, hidden } = analysis;
+  // Realisable gain only counts confident, slower zones.
+  const totalGain = items
+    .filter((i) => i.gainS > 0 && i.confidence >= LOW_CONFIDENCE_FLAG)
+    .reduce((a, b) => a + b.gainS, 0);
 
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b flex items-center justify-between gap-3 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span>What-if · Ref L{ref.lap} · {items.length} brake zones</span>
+        <span>
+          What-if · Ref L{ref.lap} · {items.length} zones
+          {hidden > 0 && <span className="ml-1 text-amber-400/70">(+{hidden} hidden, low confidence)</span>}
+        </span>
         <span>
           Realisable gain{" "}
           <span className="text-fuchsia-400">−{totalGain.toFixed(3)}s</span>
@@ -229,6 +283,7 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
             const speedDelta = it.best.apexMinSpeed - it.refStats.apexMinSpeed;
             const exitDelta = it.best.exitSpeed - it.refStats.exitSpeed;
             const slower = it.gainS > 0.005;
+            const lowConf = it.confidence < LOW_CONFIDENCE_FLAG;
             return (
               <button
                 key={it.idx}
@@ -246,6 +301,25 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
                       {(it.zone.startPct * 100).toFixed(1)}–
                       {(it.zone.endPct * 100).toFixed(1)}%
                     </span>
+                    <span
+                      title={
+                        lowConf
+                          ? `Low confidence${it.reasons.length ? `: ${it.reasons.join(", ")}` : ""}`
+                          : "High confidence"
+                      }
+                      className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-px text-[9px] uppercase tracking-wider ${
+                        lowConf
+                          ? "bg-amber-500/15 text-amber-400"
+                          : "bg-emerald-500/10 text-emerald-400"
+                      }`}
+                    >
+                      {lowConf ? (
+                        <ShieldAlert className="h-2.5 w-2.5" />
+                      ) : (
+                        <ShieldCheck className="h-2.5 w-2.5" />
+                      )}
+                      {Math.round(it.confidence * 100)}%
+                    </span>
                   </span>
                   <span
                     className={`flex items-center gap-1 ${
@@ -260,6 +334,11 @@ export function Counterfactuals({ parsed }: { parsed: IbtParsed }) {
                     {slower ? `−${it.gainS.toFixed(3)}s vs L${it.best.lap}` : "Already optimal here"}
                   </span>
                 </div>
+                {lowConf && it.reasons.length > 0 && (
+                  <div className="pl-4 font-mono text-[10px] text-amber-400/80">
+                    Flagged: {it.reasons.join(" · ")}
+                  </div>
+                )}
                 {slower && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 pl-4 font-mono text-[10px] text-muted-foreground">
                     {releaseDeltaPct != null && (
