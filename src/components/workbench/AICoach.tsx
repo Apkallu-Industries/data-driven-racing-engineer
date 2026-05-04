@@ -1,9 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
 import { analyzeTelemetry } from "@/server/coach.functions";
+import { fetchTrackCarHistory } from "@/server/history.functions";
+import { speakText } from "@/server/tts.functions";
 import { buildSessionSummary, buildCoachPayload, type CoachMode } from "@/lib/coach/summarize";
-import { Brain, Sparkles, Loader2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { buildPhysicsSummary } from "@/lib/coach/physics";
+import {
+  Brain,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Volume2,
+  History,
+} from "lucide-react";
 
 interface ConciseTip {
   priority: "high" | "medium" | "low";
@@ -34,10 +46,12 @@ export function AICoach({
   parsed,
   track,
   car,
+  sessionId,
 }: {
   parsed: IbtParsed;
   track?: string | null;
   car?: string | null;
+  sessionId?: string;
 }) {
   const { refLap, cmpLap } = useWorkbench();
   const [mode, setMode] = useState<CoachMode>("single");
@@ -47,11 +61,39 @@ export function AICoach({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConciseResult | DetailedResult | null>(null);
   const [resultDetailed, setResultDetailed] = useState(false);
+  const [useHistory, setUseHistory] = useState(true);
+  const [historyMatches, setHistoryMatches] = useState<number | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   const summary = useMemo(
     () => buildSessionSummary(parsed, track ?? undefined, car ?? undefined),
     [parsed, track, car],
   );
+  const physics = useMemo(
+    () => buildPhysicsSummary(parsed, refLap),
+    [parsed, refLap],
+  );
+
+  // Probe how many prior sessions exist for this track + car so we can show count.
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryMatches(null);
+    if (!track || !car) return;
+    (async () => {
+      try {
+        const r = await fetchTrackCarHistory({
+          data: { track, car, excludeSessionId: sessionId },
+        });
+        if (cancelled) return;
+        const h = (r as { history?: { totalSessions: number } | null }).history;
+        setHistoryMatches(h?.totalSessions ?? 0);
+      } catch {
+        if (!cancelled) setHistoryMatches(0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [track, car, sessionId]);
 
   const canRun = summary.laps.length > 0 && (mode !== "compare" || summary.laps.length >= 2);
 
@@ -60,7 +102,26 @@ export function AICoach({
     setError(null);
     setResult(null);
     try {
-      const payload = buildCoachPayload(summary, mode, refLap, cmpLap, detailed);
+      let history = null;
+      if (useHistory && track && car) {
+        try {
+          const r = await fetchTrackCarHistory({
+            data: { track, car, excludeSessionId: sessionId },
+          });
+          history = (r as { history?: unknown }).history ?? null;
+        } catch {
+          history = null;
+        }
+      }
+      const payload = buildCoachPayload(
+        summary,
+        mode,
+        refLap,
+        cmpLap,
+        detailed,
+        physics,
+        history as never,
+      );
       const resp = await analyzeTelemetry({ data: { payload, detailed } });
       const r = resp as { error?: string; result?: unknown; detailed?: boolean };
       if (r.error) {
@@ -75,6 +136,30 @@ export function AICoach({
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const speak = async () => {
+    if (!result || speaking) return;
+    setSpeaking(true);
+    setTtsError(null);
+    try {
+      const text = resultDetailed
+        ? renderDetailedForSpeech(result as DetailedResult)
+        : renderConciseForSpeech(result as ConciseResult);
+      const resp = await speakText({ data: { text } });
+      const r = resp as { error?: string; audioBase64?: string; mime?: string };
+      if (r.error || !r.audioBase64) {
+        setTtsError(r.error ?? "Voice unavailable");
+        return;
+      }
+      const audio = new Audio(`data:${r.mime ?? "audio/mpeg"};base64,${r.audioBase64}`);
+      audio.onended = () => setSpeaking(false);
+      audio.onerror = () => { setTtsError("Playback failed"); setSpeaking(false); };
+      await audio.play();
+    } catch (e) {
+      setTtsError(e instanceof Error ? e.message : "TTS failed");
+      setSpeaking(false);
     }
   };
 
@@ -121,6 +206,24 @@ export function AICoach({
               <span className="text-muted-foreground">Detailed</span>
             </label>
 
+            {historyMatches != null && historyMatches > 0 && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <label className="flex cursor-pointer items-center gap-1.5" title="Compare against your prior sessions on the same track + car">
+                  <input
+                    type="checkbox"
+                    checked={useHistory}
+                    onChange={(e) => setUseHistory(e.target.checked)}
+                    className="h-3 w-3 accent-primary"
+                  />
+                  <History className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    History ({historyMatches})
+                  </span>
+                </label>
+              </>
+            )}
+
             <div className="ml-auto flex items-center gap-2">
               {mode === "compare" && (
                 <span className="text-muted-foreground">
@@ -131,6 +234,17 @@ export function AICoach({
                 <span className="text-muted-foreground">
                   Lap {refLap ?? "best"}
                 </span>
+              )}
+              {result && (
+                <button
+                  onClick={speak}
+                  disabled={speaking}
+                  title="Read tips aloud"
+                  className="flex items-center gap-1 rounded-sm bg-rail px-2 py-1 text-[11px] uppercase tracking-wider text-foreground hover:bg-accent disabled:opacity-40"
+                >
+                  {speaking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Volume2 className="h-3 w-3" />}
+                  {speaking ? "Speaking" : "Speak"}
+                </button>
               )}
               <button
                 onClick={run}
@@ -152,6 +266,12 @@ export function AICoach({
       {/* Body */}
       {!collapsed && (
         <div className="max-h-72 overflow-y-auto px-3 py-2">
+          {ttsError && (
+            <div className="mb-2 flex items-start gap-2 rounded-sm border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{ttsError}</span>
+            </div>
+          )}
           {!canRun && (
             <div className="text-xs text-muted-foreground">
               {mode === "compare"
@@ -191,6 +311,25 @@ export function AICoach({
       )}
     </div>
   );
+}
+
+function renderConciseForSpeech(d: ConciseResult): string {
+  const parts: string[] = [d.headline];
+  d.tips.forEach((t, i) => {
+    parts.push(
+      `${i + 1}. ${t.location}. ${t.tip}. ${t.reason}${t.estGainS > 0 ? `. Estimated gain ${t.estGainS.toFixed(2)} seconds.` : "."}`,
+    );
+  });
+  return parts.join(" ");
+}
+function renderDetailedForSpeech(d: DetailedResult): string {
+  const parts: string[] = [d.headline, d.overview];
+  d.corners.forEach((c) => {
+    parts.push(
+      `${c.label}. Entry: ${c.entry} Mid: ${c.mid} Exit: ${c.exit}${c.estGainS > 0 ? ` Gain ${c.estGainS.toFixed(2)} seconds.` : ""}`,
+    );
+  });
+  return parts.join(" ");
 }
 
 function priorityClass(p: ConciseTip["priority"]) {
