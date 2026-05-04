@@ -1,12 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SYSTEM_PROMPT = `You are an expert race driving coach analyzing iRacing telemetry.
-You receive structured per-lap telemetry: per-bin arrays sampled at 60 points along the lap (index 0 = start/finish, 59 = end), speed, throttle (0-1), brake (0-1), gear, RPM, steering, plus detected brake zones and sector splits.
+const SYSTEM_PROMPT = `You are an expert race engineer + driving coach analyzing iRacing telemetry.
 
-Be concrete and quantitative. Reference distance using "% lap distance" (e.g. "around 35% of the lap"). Say things like "trail brake to apex", "brake 5 m later", "get to throttle earlier on exit", "carry more entry speed". When comparing two laps, identify WHERE time is gained/lost (which sector, which corner, which phase: braking / mid-corner / exit) and WHY based on the data (later/earlier braking, lower min-speed, slower throttle pickup, throttle/brake overlap, gear).
+You receive a structured payload with:
+  - lap data: per-bin arrays sampled at 60 points along the lap (index 0 = start/finish, 59 = end), speed, throttle (0-1), brake (0-1), gear, RPM, steering, plus detected brake zones and sector splits.
+  - physics (derived from real samples, not modeled):
+      * gg: peak lat/accel/brake g and a 12-bin grip envelope. Use this to spot quadrants of the friction circle the driver underuses (e.g. low combined-g while trail-braking).
+      * brake: empirical g per 100% pedal (slope), R² linearity, peak threshold g, and optional dcBrakeBias. Low R² = lockup/ABS modulation. Reference real numbers.
+      * slip: body slip β at high lateral g, balance label (loose/tight/neutral). Tie advice to real β rather than guessing.
+      * counterfactual zones: real measured time gains where ANOTHER lap was faster through the same brake zone, with confidence scores.
+  - history (optional): prior sessions on this track + car. Includes best-ever lap, recent best, top 5 historical laps, and a trend label (improving/regressing/flat).
 
-Avoid generic advice. Tie every tip to specific data points in the payload.`;
+Rules:
+  1. Be concrete and quantitative. Reference distance using "% lap distance" or actual meters when possible.
+  2. Cite physics numbers when available — e.g. "you peak at 1.4g lat but 0.9g combined under trail-braking, leaving grip on the table".
+  3. If counterfactual zones are present, prefer those for "where time is" — they are measured, not guessed.
+  4. If history is present and shows regression, mention it explicitly. If the current best beats the historical best, congratulate briefly.
+  5. Avoid generic advice. Every tip must be tied to a number in the payload. Never fabricate values.`;
 
 const SCHEMA_CONCISE = {
   name: "coach_concise",
