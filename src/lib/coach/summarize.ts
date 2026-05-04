@@ -1,4 +1,5 @@
 import type { IbtParsed, IbtLap } from "@/lib/ibt/types";
+import type { PhysicsSummary } from "@/lib/coach/physics";
 
 const NUM_BINS = 60; // distance bins along the lap (LapDistPct)
 const NUM_SECTORS = 3;
@@ -197,6 +198,23 @@ export function buildSessionSummary(
 
 export type CoachMode = "single" | "compare" | "session";
 
+export interface HistoricalContextLap {
+  sessionName?: string;
+  recordedAt?: string | null;
+  lapTimeS: number;
+  bestLapS?: number | null;
+  sectors?: (number | null)[];
+}
+export interface HistoricalContext {
+  track?: string | null;
+  car?: string | null;
+  totalSessions: number;
+  bestEverS: number | null;
+  recentBestS: number | null; // best among last few sessions
+  laps: HistoricalContextLap[]; // top N fastest laps across history
+  trend?: "improving" | "regressing" | "flat" | null;
+}
+
 /** Build the payload sent to the AI server function. Trims to keep tokens low. */
 export function buildCoachPayload(
   summary: SessionSummary,
@@ -204,6 +222,8 @@ export function buildCoachPayload(
   refLap: number | null,
   cmpLap: number | null,
   detailed: boolean,
+  physics?: PhysicsSummary,
+  history?: HistoricalContext | null,
 ) {
   if (mode === "single") {
     const lap =
@@ -217,6 +237,8 @@ export function buildCoachPayload(
       speedUnit: summary.speedUnit,
       bestSectors: summary.bestSectors,
       lap,
+      physics,
+      history,
     };
   }
   if (mode === "compare") {
@@ -234,6 +256,8 @@ export function buildCoachPayload(
       bestSectors: summary.bestSectors,
       lapA: a,
       lapB: b,
+      physics,
+      history,
     };
   }
   // session: send slim per-lap stats only (no per-bin arrays) plus best lap full data
@@ -260,5 +284,7 @@ export function buildCoachPayload(
     bestSectors: summary.bestSectors,
     bestLap: best,
     laps: slim,
+    physics,
+    history,
   };
 }
