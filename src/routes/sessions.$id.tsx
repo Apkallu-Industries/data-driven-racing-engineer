@@ -195,7 +195,7 @@ function WorkbenchPage() {
                   </div>
                 </div>
               </div>
-              <AICoach parsed={parsed} track={sess?.track} car={sess?.car} />
+              <AICoach parsed={parsed} track={sess?.track} car={sess?.car} sessionId={id} />
             </div>
           </div>
         </>
