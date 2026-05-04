@@ -14,6 +14,8 @@ import { LapList } from "@/components/workbench/LapList";
 import { GGDiagram } from "@/components/workbench/GGDiagram";
 import { OptimalLap } from "@/components/workbench/OptimalLap";
 import { Counterfactuals } from "@/components/workbench/Counterfactuals";
+import { BrakeBias } from "@/components/workbench/BrakeBias";
+import { SlipAngle } from "@/components/workbench/SlipAngle";
 import { AICoach } from "@/components/workbench/AICoach";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -37,7 +39,7 @@ function WorkbenchPage() {
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<
-    "readout" | "laps" | "gg" | "optimal" | "whatif"
+    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip"
   >("readout");
 
   useEffect(() => {
@@ -156,7 +158,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps", "gg", "optimal", "whatif"] as const).map((t) => (
+                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -174,7 +176,11 @@ function WorkbenchPage() {
                               ? "g-g"
                               : t === "optimal"
                                 ? "Optimal"
-                                : "What-if"}
+                                : t === "whatif"
+                                  ? "What-if"
+                                  : t === "brake"
+                                    ? "Brake"
+                                    : "Slip"}
                       </button>
                     ))}
                   </div>
@@ -184,6 +190,8 @@ function WorkbenchPage() {
                     {bottomTab === "gg" && <GGDiagram parsed={parsed} />}
                     {bottomTab === "optimal" && <OptimalLap parsed={parsed} />}
                     {bottomTab === "whatif" && <Counterfactuals parsed={parsed} />}
+                    {bottomTab === "brake" && <BrakeBias parsed={parsed} />}
+                    {bottomTab === "slip" && <SlipAngle parsed={parsed} />}
                   </div>
                 </div>
               </div>

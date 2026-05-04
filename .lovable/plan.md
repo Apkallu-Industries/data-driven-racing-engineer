@@ -107,8 +107,8 @@ Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay r
 1. **Physics-derived virtual channels**
    - ✅ g-g diagram (LatAccel vs LongAccel) with empirical grip envelope (`GGDiagram.tsx`)
    - ✅ Theoretical optimal lap from best micro-sectors (`OptimalLap.tsx`)
-   - ⬜ Brake bias inference from longitudinal G vs pedal force
-   - ⬜ Slip angle estimate (kinematic bicycle: yaw + speed + steering)
+   - ✅ Brake response & bias — median decel-per-pedal-bin + linearity R² + dcBrakeBias (`BrakeBias.tsx`)
+   - ✅ Body slip angle β from VelocityX/VelocityY + balance signature (`SlipAngle.tsx`)
    - ⬜ Tyre energy / sliding work per corner
 2. **AI Coach v2 — grounded, not hallucinated**
    - ✅ Counterfactual coach with measured per-zone deltas + confidence scoring (`Counterfactuals.tsx`)
