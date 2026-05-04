@@ -112,10 +112,9 @@ Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay r
    - ⬜ Tyre energy / sliding work per corner
 2. **AI Coach v2 — grounded, not hallucinated**
    - ✅ Counterfactual coach with measured per-zone deltas + confidence scoring (`Counterfactuals.tsx`)
-   - 🟡 Session/compare/single AI summarisation (`AICoach.tsx`) — still bin-summary based
-   - ⬜ Retrieval over user history across sessions ("last 6 races at Spa…")
-   - ⬜ Physics re-integration counterfactual ("brake 5m later → predicted exit Δ")
-   - ⬜ Voice debrief via TTS (ElevenLabs)
+   - ✅ Physics re-integration: g-g, brake bias, slip β, counterfactual zones now feed the coach payload (`lib/coach/physics.ts`)
+   - ✅ Cross-session retrieval (same track + car): best-ever, recent, trend (`server/history.functions.ts`)
+   - ✅ Voice debrief via ElevenLabs TTS — opt-in "Speak" button on coach output (`server/tts.functions.ts`)
 3. **Driver DNA / fingerprint** ⬜
    - Cluster style across sessions; compare to past self / anonymised community baseline
 
