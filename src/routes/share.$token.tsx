@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Activity } from "lucide-react";
 import { useWorkbench } from "@/lib/store";
 import { parseIbtInWorker } from "@/lib/ibt/parseInWorker";
-import { getSharedLap } from "@/server/share.functions";
+import { getSharedLap, refreshSharedSignedUrl } from "@/server/share.functions";
 import { TrackMap } from "@/components/workbench/TrackMap";
 import { ReplayThree } from "@/components/workbench/ReplayThree";
 import { PianoRoll } from "@/components/workbench/PianoRoll";
@@ -12,14 +12,23 @@ import { SectorSpider } from "@/components/workbench/SectorSpider";
 import { Timeline } from "@/components/workbench/Timeline";
 
 export const Route = createFileRoute("/share/$token")({
-  head: () => ({
-    meta: [
-      { title: "Shared Lap — ApexTrace" },
-      { name: "description", content: "Public read-only telemetry lap card." },
-      { property: "og:title", content: "Shared Lap — ApexTrace" },
-      { property: "og:description", content: "Public read-only telemetry lap card." },
-    ],
-  }),
+  head: ({ params }) => {
+    const og = `/api/public/og/share/${params.token}`;
+    return {
+      meta: [
+        { title: "Shared Lap — ApexTrace" },
+        { name: "description", content: "Public read-only telemetry lap card." },
+        { property: "og:title", content: "Shared Lap — ApexTrace" },
+        { property: "og:description", content: "Public read-only telemetry lap card." },
+        { property: "og:image", content: og },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:type", content: "website" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: og },
+      ],
+    };
+  },
   component: SharedLapPage,
 });
 
