@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Activity } from "lucide-react";
 import { useWorkbench } from "@/lib/store";
@@ -45,6 +45,7 @@ interface SessionMeta {
 function SharedLapPage() {
   const { token } = Route.useParams();
   const fetchShare = useServerFn(getSharedLap);
+  const refreshUrl = useServerFn(refreshSharedSignedUrl);
   const { parsed, setParsed, setRefLap, setCmpLap, refLap, cmpLap } = useWorkbench();
   const [meta, setMeta] = useState<SessionMeta | null>(null);
   const [tab, setTab] = useState<"map" | "3d" | "piano" | "spider">("map");
@@ -53,6 +54,7 @@ function SharedLapPage() {
     pct: 0,
   });
   const [err, setErr] = useState<string | null>(null);
+  const signedUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +65,7 @@ function SharedLapPage() {
         const share = await fetchShare({ data: { token } });
         if (cancelled) return;
         setMeta(share.session);
+        signedUrlRef.current = share.signedUrl;
         setProgress({ phase: "download", pct: 5 });
         const res = await fetch(share.signedUrl);
         if (!res.ok) throw new Error(`Download failed (${res.status})`);
@@ -84,6 +87,23 @@ function SharedLapPage() {
       cancelled = true;
     };
   }, [token, fetchShare, setParsed, setRefLap, setCmpLap]);
+
+  // Auto re-sign the storage URL every ~50 minutes so the link stays usable
+  // even if the tab is left open for hours.
+  useEffect(() => {
+    const id = setInterval(
+      async () => {
+        try {
+          const r = await refreshUrl({ data: { token } });
+          signedUrlRef.current = r.signedUrl;
+        } catch {
+          /* ignore — link may be revoked or expired */
+        }
+      },
+      50 * 60 * 1000,
+    );
+    return () => clearInterval(id);
+  }, [token, refreshUrl]);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
