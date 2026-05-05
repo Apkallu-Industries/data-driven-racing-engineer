@@ -322,7 +322,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         if (c.y[i] < minY) minY = c.y[i];
         if (c.y[i] > maxY) maxY = c.y[i];
       }
-      return { x: c.x, y: c.y, c: l.c, lap: l.lap, timeS: l.timeS, st: l.st };
+      return { x: c.x, y: c.y, c: l.c, lap: l.lap, timeS: l.timeS, st: l.st, speed: l.speed };
     });
     return {
       kind: "aligned" as const,
