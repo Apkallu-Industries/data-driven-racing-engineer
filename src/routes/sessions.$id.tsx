@@ -17,6 +17,9 @@ import { Counterfactuals } from "@/components/workbench/Counterfactuals";
 import { BrakeBias } from "@/components/workbench/BrakeBias";
 import { SlipAngle } from "@/components/workbench/SlipAngle";
 import { AICoach } from "@/components/workbench/AICoach";
+import { ReplayThree } from "@/components/workbench/ReplayThree";
+import { PianoRoll } from "@/components/workbench/PianoRoll";
+import { SectorSpider } from "@/components/workbench/SectorSpider";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -39,7 +42,7 @@ function WorkbenchPage() {
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<
-    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip"
+    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider"
   >("readout");
 
   useEffect(() => {
@@ -158,7 +161,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip"] as const).map((t) => (
+                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip", "replay3d", "piano", "spider"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -180,7 +183,13 @@ function WorkbenchPage() {
                                   ? "What-if"
                                   : t === "brake"
                                     ? "Brake"
-                                    : "Slip"}
+                                    : t === "slip"
+                                      ? "Slip"
+                                      : t === "replay3d"
+                                        ? "3D"
+                                        : t === "piano"
+                                          ? "Piano"
+                                          : "Spider"}
                       </button>
                     ))}
                   </div>
@@ -192,6 +201,9 @@ function WorkbenchPage() {
                     {bottomTab === "whatif" && <Counterfactuals parsed={parsed} />}
                     {bottomTab === "brake" && <BrakeBias parsed={parsed} />}
                     {bottomTab === "slip" && <SlipAngle parsed={parsed} />}
+                    {bottomTab === "replay3d" && <ReplayThree parsed={parsed} />}
+                    {bottomTab === "piano" && <PianoRoll parsed={parsed} />}
+                    {bottomTab === "spider" && <SectorSpider parsed={parsed} />}
                   </div>
                 </div>
               </div>

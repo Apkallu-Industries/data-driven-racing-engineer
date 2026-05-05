@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useCallback } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench, type MapMode, type MapColorChannel } from "@/lib/store";
-import { Plus, Minus, Maximize2, Flame, Waves, GitCompare } from "lucide-react";
+import { Plus, Minus, Maximize2, Flame, Waves, GitCompare, Activity } from "lucide-react";
 
 const W = 400;
 const H = 260;
@@ -20,6 +20,8 @@ interface BuiltLap {
   timeS: number;
   /** Session-time offset per bin, used to derive sector splits. */
   st: Float32Array;
+  /** Speed value per bin (used for line thickness). Empty if Speed not present. */
+  speed: Float32Array;
 }
 
 /** Build per-lap resampled XY using LapDistPct as the abscissa. */
@@ -31,9 +33,13 @@ function buildLapsByDist(
   const lapDistPct = parsed.channels["LapDistPct"]?.data;
   if (!xy || !lapDistPct) return null;
 
+  // DeltaT is a derived channel computed after lap construction.
   const channelData =
-    channelName !== "none" ? parsed.channels[channelName]?.data : undefined;
+    channelName !== "none" && channelName !== "DeltaT"
+      ? parsed.channels[channelName]?.data
+      : undefined;
   const sessionTime = parsed.channels["SessionTime"]?.data;
+  const speedData = parsed.channels["Speed"]?.data;
 
   const laps: BuiltLap[] = [];
   let cMin = Infinity;
@@ -43,8 +49,10 @@ function buildLapsByDist(
     if (lap.endTick - lap.startTick < 60) continue;
     const x = new Float32Array(NUM_SAMPLES);
     const y = new Float32Array(NUM_SAMPLES);
-    const c = new Float32Array(channelData ? NUM_SAMPLES : 0);
+    const wantC = !!channelData || channelName === "DeltaT";
+    const c = new Float32Array(wantC ? NUM_SAMPLES : 0);
     const st = new Float32Array(sessionTime ? NUM_SAMPLES : 0);
+    const speed = new Float32Array(speedData ? NUM_SAMPLES : 0);
 
     // Build a monotonic-ish list of (pct, tick) for this lap.
     // Filter out the wrap from ~1 -> 0 at the line.
@@ -82,6 +90,9 @@ function buildLapsByDist(
       if (sessionTime) {
         st[i] = sessionTime[t0] * (1 - ff) + sessionTime[t1] * ff;
       }
+      if (speedData) {
+        speed[i] = speedData[t0] * (1 - ff) + speedData[t1] * ff;
+      }
     }
 
     // Re-anchor each lap so it starts at (0,0). Cheap drift cleanup that
@@ -92,7 +103,7 @@ function buildLapsByDist(
       y[i] -= y0;
     }
 
-    laps.push({ x, y, c, lap: lap.lap, timeS: lap.timeS, st });
+    laps.push({ x, y, c, lap: lap.lap, timeS: lap.timeS, st, speed });
   }
 
   if (!isFinite(cMin)) cMin = 0;
@@ -128,6 +139,8 @@ function averageLaps(laps: BuiltLap[]): {
   meanDev: Float32Array;
   /** Per-bin mean heading error in radians vs the averaged tangent. */
   meanHead: Float32Array;
+  /** Per-bin averaged speed across laps (empty if speed not available). */
+  speed: Float32Array;
 } | null {
   if (laps.length === 0) return null;
   const n = laps[0].x.length;
@@ -135,6 +148,8 @@ function averageLaps(laps: BuiltLap[]): {
   const ay = new Float32Array(n);
   const ac = new Float32Array(n);
   const hasC = laps[0].c.length === n;
+  const hasSpeed = laps[0].speed && laps[0].speed.length === n;
+  const aspeed = new Float32Array(hasSpeed ? n : 0);
   let count = 0;
   // First pass: averaged centerline.
   const closedLaps: { x: Float32Array; y: Float32Array }[] = [];
@@ -145,6 +160,7 @@ function averageLaps(laps: BuiltLap[]): {
       ax[i] += closed.x[i];
       ay[i] += closed.y[i];
       if (hasC) ac[i] += lap.c[i];
+      if (hasSpeed) aspeed[i] += lap.speed[i];
     }
     count++;
   }
@@ -152,6 +168,7 @@ function averageLaps(laps: BuiltLap[]): {
     ax[i] /= count;
     ay[i] /= count;
     if (hasC) ac[i] /= count;
+    if (hasSpeed) aspeed[i] /= count;
   }
 
   // Second pass: per-bin perpendicular spread & heading error vs the avg tangent.
@@ -188,7 +205,7 @@ function averageLaps(laps: BuiltLap[]): {
     meanDev[i] = sumAbs / closedLaps.length;
     meanHead[i] = sumHead / closedLaps.length;
   }
-  return { x: ax, y: ay, c: ac, spread, meanDev, meanHead };
+  return { x: ax, y: ay, c: ac, spread, meanDev, meanHead, speed: aspeed };
 }
 
 /** Compute per-sector times for one lap using LapDistPct boundaries (1/3, 2/3). */
@@ -231,6 +248,9 @@ function rampColor(channel: MapColorChannel, t: number): string {
       return `oklch(${0.4 + clamp * 0.45} 0.18 ${60 - clamp * 30})`;
     case "Gear":
       return `oklch(${0.55 + clamp * 0.25} 0.16 ${200 + clamp * 100})`;
+    case "DeltaT":
+      // Diverging: green = gain (cmp faster), red = loss; t maps [0..1] from -1..+1
+      return diffColor((clamp - 0.5) * 2);
     default:
       return "var(--ch-default)";
   }
@@ -251,6 +271,8 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
     setShowSectorHeat,
     setShowTrackBands,
     setShowDeviation,
+    mapThicknessBySpeed,
+    setMapThicknessBySpeed,
   } = useWorkbench();
 
   const [zoom, setZoom] = useState(1);
@@ -280,6 +302,32 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
 
     const lapsBuilt = buildLapsByDist(parsed, mapColorBy);
     if (!lapsBuilt || lapsBuilt.laps.length === 0) return null;
+
+    // For DeltaT mode, compute per-bin cumulative time delta vs the reference lap.
+    if (mapColorBy === "DeltaT") {
+      const ref =
+        lapsBuilt.laps.find((l) => l.lap === refLap) ?? lapsBuilt.laps[0];
+      if (ref && ref.st.length === ref.x.length) {
+        let dMin = Infinity, dMax = -Infinity;
+        const t0Ref = ref.st[0];
+        for (const lap of lapsBuilt.laps) {
+          if (lap.st.length !== lap.x.length || lap.c.length !== lap.x.length) continue;
+          const t0Lap = lap.st[0];
+          for (let i = 0; i < lap.x.length; i++) {
+            const lapDt = lap.st[i] - t0Lap;
+            const refDt = ref.st[i] - t0Ref;
+            const d = lapDt - refDt; // positive = slower than ref
+            lap.c[i] = d;
+            if (d < dMin) dMin = d;
+            if (d > dMax) dMax = d;
+          }
+        }
+        // Symmetric range so 0 sits at the middle of the diverging ramp.
+        const m = Math.max(Math.abs(dMin), Math.abs(dMax), 0.05);
+        lapsBuilt.cMin = -m;
+        lapsBuilt.cMax = m;
+      }
+    }
 
     if (mapMode === "averaged") {
       const avg = averageLaps(lapsBuilt.laps);
@@ -311,7 +359,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         if (c.y[i] < minY) minY = c.y[i];
         if (c.y[i] > maxY) maxY = c.y[i];
       }
-      return { x: c.x, y: c.y, c: l.c, lap: l.lap, timeS: l.timeS, st: l.st };
+      return { x: c.x, y: c.y, c: l.c, lap: l.lap, timeS: l.timeS, st: l.st, speed: l.speed };
     });
     return {
       kind: "aligned" as const,
@@ -320,7 +368,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
       cMin: lapsBuilt.cMin,
       cMax: lapsBuilt.cMax,
     };
-  }, [parsed, xy, mapMode, mapColorBy]);
+  }, [parsed, xy, mapMode, mapColorBy, refLap]);
 
   const projection = useMemo(() => {
     if (!built) return null;
@@ -350,10 +398,20 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
 
   // Build colored line as N short segments. Returns array of {d, color}.
   const buildColoredSegments = useCallback(
-    (x: Float32Array, y: Float32Array, c: Float32Array, cMin: number, cMax: number) => {
+    (
+      x: Float32Array,
+      y: Float32Array,
+      c: Float32Array,
+      cMin: number,
+      cMax: number,
+      speed?: Float32Array,
+      speedMin?: number,
+      speedMax?: number,
+    ) => {
       if (!projection) return [];
-      const segs: { d: string; color: string }[] = [];
+      const segs: { d: string; color: string; w: number }[] = [];
       const step = Math.max(1, Math.floor(x.length / 250)); // ~250 segments
+      const sRange = (speedMax ?? 0) - (speedMin ?? 0);
       for (let i = 0; i < x.length - step; i += step) {
         const x0 = projection.px(x[i]);
         const y0 = projection.py(y[i]);
@@ -361,7 +419,14 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         const y1 = projection.py(y[i + step]);
         const v = c.length ? (c[i] + c[i + step]) / 2 : 0;
         const t = (v - cMin) / Math.max(1e-6, cMax - cMin);
-        segs.push({ d: `M ${x0} ${y0} L ${x1} ${y1}`, color: rampColor(mapColorBy, t) });
+        let w = 1;
+        if (speed && speed.length && sRange > 0) {
+          const sv = (speed[i] + speed[i + step]) / 2;
+          const sn = Math.max(0, Math.min(1, (sv - (speedMin ?? 0)) / sRange));
+          // Map speed → 0.6×..1.8× nominal width.
+          w = 0.6 + sn * 1.2;
+        }
+        segs.push({ d: `M ${x0} ${y0} L ${x1} ${y1}`, color: rampColor(mapColorBy, t), w });
       }
       return segs;
     },
@@ -449,22 +514,36 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             strokeWidth={2 / zoom}
           />
         ) : (
-          buildColoredSegments(
-            refLapBuilt.x,
-            refLapBuilt.y,
-            refLapBuilt.c,
-            built.cMin,
-            built.cMax,
-          ).map((s, i) => (
-            <path
-              key={i}
-              d={s.d}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2.4 / zoom}
-              strokeLinecap="round"
-            />
-          ))
+          (() => {
+            const sp = mapThicknessBySpeed ? refLapBuilt.speed : undefined;
+            let smin = 0, smax = 0;
+            if (sp && sp.length) {
+              smin = Infinity; smax = -Infinity;
+              for (let i = 0; i < sp.length; i++) {
+                if (sp[i] < smin) smin = sp[i];
+                if (sp[i] > smax) smax = sp[i];
+              }
+            }
+            return buildColoredSegments(
+              refLapBuilt.x,
+              refLapBuilt.y,
+              refLapBuilt.c,
+              built.cMin,
+              built.cMax,
+              sp,
+              smin,
+              smax,
+            ).map((s, i) => (
+              <path
+                key={i}
+                d={s.d}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={(2.4 * s.w) / zoom}
+                strokeLinecap="round"
+              />
+            ));
+          })()
         )}
       </>
     );
@@ -485,16 +564,36 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
           strokeWidth={2.4 / zoom}
         />
       ) : (
-        buildColoredSegments(avg.x, avg.y, avg.c, built.cMin, built.cMax).map((s, i) => (
-          <path
-            key={i}
-            d={s.d}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={2.8 / zoom}
-            strokeLinecap="round"
-          />
-        ))
+        (() => {
+          const sp = mapThicknessBySpeed ? avg.speed : undefined;
+          let smin = 0, smax = 0;
+          if (sp && sp.length) {
+            smin = Infinity; smax = -Infinity;
+            for (let i = 0; i < sp.length; i++) {
+              if (sp[i] < smin) smin = sp[i];
+              if (sp[i] > smax) smax = sp[i];
+            }
+          }
+          return buildColoredSegments(
+            avg.x,
+            avg.y,
+            avg.c,
+            built.cMin,
+            built.cMax,
+            sp,
+            smin,
+            smax,
+          ).map((s, i) => (
+            <path
+              key={i}
+              d={s.d}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={(2.8 * s.w) / zoom}
+              strokeLinecap="round"
+            />
+          ));
+        })()
       );
   }
 
@@ -541,7 +640,10 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
   };
   const zoomBy = (factor: number) => setZoom((z) => clampZoom(z * factor));
 
-  const colorChannel = mapColorBy !== "none" ? parsed.channels[mapColorBy] : undefined;
+  const colorChannel =
+    mapColorBy !== "none" && mapColorBy !== "DeltaT"
+      ? parsed.channels[mapColorBy]
+      : undefined;
 
   // ---------- Overlays ----------
   // Sector heatmap: per-sector, color the reference racing line by gain/loss vs
@@ -711,8 +813,18 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             <option value="Speed">Speed</option>
             <option value="RPM">RPM</option>
             <option value="Gear">Gear</option>
+            <option value="DeltaT">Δt vs ref</option>
           </select>
           <div className="flex items-center gap-px overflow-hidden rounded-sm border border-border">
+            <button
+              onClick={() => setMapThicknessBySpeed(!mapThicknessBySpeed)}
+              className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase ${
+                mapThicknessBySpeed ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Line thickness driven by speed"
+            >
+              <Activity className="h-3 w-3" /> Thick
+            </button>
             <button
               onClick={() => setShowSectorHeat(!showSectorHeat)}
               className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase ${
@@ -841,18 +953,22 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         </div>
       )}
       {/* Color-channel legend */}
-      {mapColorBy !== "none" && built.kind !== "drift" && colorChannel && (
+      {mapColorBy !== "none" && built.kind !== "drift" && (colorChannel || mapColorBy === "DeltaT") && (
         <div className="hairline-t flex items-center gap-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span>{mapColorBy}</span>
-          <span className="tabular-nums">{built.cMin.toFixed(1)}</span>
+          <span>{mapColorBy === "DeltaT" ? "Δt vs ref" : mapColorBy}</span>
+          <span className="tabular-nums">
+            {mapColorBy === "DeltaT" ? `${built.cMin.toFixed(2)}s` : built.cMin.toFixed(1)}
+          </span>
           <span
             className="h-1.5 flex-1 rounded-full"
             style={{
               background: `linear-gradient(to right, ${rampColor(mapColorBy, 0)}, ${rampColor(mapColorBy, 0.5)}, ${rampColor(mapColorBy, 1)})`,
             }}
           />
-          <span className="tabular-nums">{built.cMax.toFixed(1)}</span>
-          {colorChannel.unit && <span>{colorChannel.unit}</span>}
+          <span className="tabular-nums">
+            {mapColorBy === "DeltaT" ? `+${built.cMax.toFixed(2)}s` : built.cMax.toFixed(1)}
+          </span>
+          {colorChannel?.unit && <span>{colorChannel.unit}</span>}
         </div>
       )}
     </div>

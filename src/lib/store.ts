@@ -4,7 +4,7 @@ import type { IbtParsed } from "./ibt/types";
 export const DEFAULT_CHANNELS = ["Speed", "Throttle", "Brake", "RPM", "Gear", "SteeringWheelAngle", "LatAccel", "LongAccel"];
 
 export type MapMode = "drift" | "aligned" | "averaged";
-export type MapColorChannel = "none" | "Throttle" | "Brake" | "Speed" | "RPM" | "Gear";
+export type MapColorChannel = "none" | "Throttle" | "Brake" | "Speed" | "RPM" | "Gear" | "DeltaT";
 
 export const CHANNEL_COLOR: Record<string, string> = {
   Speed: "var(--ch-speed)",
@@ -53,6 +53,9 @@ interface WorkbenchState {
   setShowSectorHeat: (v: boolean) => void;
   setShowTrackBands: (v: boolean) => void;
   setShowDeviation: (v: boolean) => void;
+
+  mapThicknessBySpeed: boolean;
+  setMapThicknessBySpeed: (v: boolean) => void;
 }
 
 export const useWorkbench = create<WorkbenchState>((set) => ({
@@ -98,4 +101,7 @@ export const useWorkbench = create<WorkbenchState>((set) => ({
   setShowSectorHeat: (v) => set({ showSectorHeat: v }),
   setShowTrackBands: (v) => set({ showTrackBands: v }),
   setShowDeviation: (v) => set({ showDeviation: v }),
+
+  mapThicknessBySpeed: false,
+  setMapThicknessBySpeed: (v) => set({ mapThicknessBySpeed: v }),
 }));
