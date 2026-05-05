@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
+import { ExportButton } from "./ExportButton";
 
 const NUM_BINS = 600;
 
@@ -45,6 +46,7 @@ function buildStrips(parsed: IbtParsed): LapStrip[] {
 export function PianoRoll({ parsed }: { parsed: IbtParsed }) {
   const { refLap } = useWorkbench();
   const [maxLaps, setMaxLaps] = useState(8);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const strips = useMemo(() => buildStrips(parsed), [parsed]);
   const visible = strips.slice(0, maxLaps);
 
@@ -67,23 +69,26 @@ export function PianoRoll({ parsed }: { parsed: IbtParsed }) {
     <div className="flex h-full flex-col">
       <div className="hairline-b flex items-center justify-between px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         <span>Piano Roll · pedals across distance</span>
-        <label className="flex items-center gap-1.5 text-[10px]">
-          <span>Laps</span>
-          <select
-            value={maxLaps}
-            onChange={(e) => setMaxLaps(parseInt(e.target.value, 10))}
-            className="rounded-sm border border-border bg-rail px-1.5 py-0.5 font-mono"
-          >
-            {[4, 6, 8, 12, 20].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-[10px]">
+            <span>Laps</span>
+            <select
+              value={maxLaps}
+              onChange={(e) => setMaxLaps(parseInt(e.target.value, 10))}
+              className="rounded-sm border border-border bg-rail px-1.5 py-0.5 font-mono"
+            >
+              {[4, 6, 8, 12, 20].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ExportButton getSvg={() => svgRef.current} filenameBase="piano-roll" />
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" preserveAspectRatio="xMidYMin meet">
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block w-full" preserveAspectRatio="xMidYMin meet">
           {/* sector dividers */}
           {[1 / 3, 2 / 3].map((p) => (
             <line
