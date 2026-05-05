@@ -265,6 +265,8 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
     setShowSectorHeat,
     setShowTrackBands,
     setShowDeviation,
+    mapThicknessBySpeed,
+    setMapThicknessBySpeed,
   } = useWorkbench();
 
   const [zoom, setZoom] = useState(1);
