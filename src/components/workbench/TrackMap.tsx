@@ -242,6 +242,9 @@ function rampColor(channel: MapColorChannel, t: number): string {
       return `oklch(${0.4 + clamp * 0.45} 0.18 ${60 - clamp * 30})`;
     case "Gear":
       return `oklch(${0.55 + clamp * 0.25} 0.16 ${200 + clamp * 100})`;
+    case "DeltaT":
+      // Diverging: green = gain (cmp faster), red = loss; t maps [0..1] from -1..+1
+      return diffColor((clamp - 0.5) * 2);
     default:
       return "var(--ch-default)";
   }
