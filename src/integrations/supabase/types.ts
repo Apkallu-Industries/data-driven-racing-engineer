@@ -18,8 +18,10 @@ export type Database = {
         Row: {
           cmp_lap: number | null
           created_at: string
+          expires_at: string | null
           id: string
           ref_lap: number | null
+          revoked_at: string | null
           session_id: string
           token: string
           user_id: string
@@ -28,8 +30,10 @@ export type Database = {
         Insert: {
           cmp_lap?: number | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           ref_lap?: number | null
+          revoked_at?: string | null
           session_id: string
           token: string
           user_id: string
@@ -38,8 +42,10 @@ export type Database = {
         Update: {
           cmp_lap?: number | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           ref_lap?: number | null
+          revoked_at?: string | null
           session_id?: string
           token?: string
           user_id?: string

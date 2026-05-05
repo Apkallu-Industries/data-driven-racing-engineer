@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as SessionsIdRouteImport } from './routes/sessions.$id'
+import { Route as ApiPublicOgShareTokenRouteImport } from './routes/api/public/og/share.$token'
 
 const HowItWorksRoute = HowItWorksRouteImport.update({
   id: '/how-it-works',
@@ -46,6 +47,11 @@ const SessionsIdRoute = SessionsIdRouteImport.update({
   path: '/sessions/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOgShareTokenRoute = ApiPublicOgShareTokenRouteImport.update({
+  id: '/api/public/og/share/$token',
+  path: '/api/public/og/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/api/public/og/share/$token': typeof ApiPublicOgShareTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions': typeof SessionsIndexRoute
+  '/api/public/og/share/$token': typeof ApiPublicOgShareTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/api/public/og/share/$token': typeof ApiPublicOgShareTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
+    | '/api/public/og/share/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions'
+    | '/api/public/og/share/$token'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
+    | '/api/public/og/share/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   SessionsIdRoute: typeof SessionsIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
+  ApiPublicOgShareTokenRoute: typeof ApiPublicOgShareTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/og/share/$token': {
+      id: '/api/public/og/share/$token'
+      path: '/api/public/og/share/$token'
+      fullPath: '/api/public/og/share/$token'
+      preLoaderRoute: typeof ApiPublicOgShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   SessionsIdRoute: SessionsIdRoute,
   ShareTokenRoute: ShareTokenRoute,
   SessionsIndexRoute: SessionsIndexRoute,
+  ApiPublicOgShareTokenRoute: ApiPublicOgShareTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
