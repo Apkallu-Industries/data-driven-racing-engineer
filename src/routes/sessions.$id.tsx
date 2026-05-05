@@ -20,6 +20,7 @@ import { AICoach } from "@/components/workbench/AICoach";
 import { ReplayThree } from "@/components/workbench/ReplayThree";
 import { PianoRoll } from "@/components/workbench/PianoRoll";
 import { SectorSpider } from "@/components/workbench/SectorSpider";
+import { SetupSheet } from "@/components/workbench/SetupSheet";
 import { ShareButton } from "@/components/workbench/ShareButton";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -43,7 +44,7 @@ function WorkbenchPage() {
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<
-    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider"
+    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider" | "setup"
   >("readout");
 
   useEffect(() => {
@@ -163,7 +164,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip", "replay3d", "piano", "spider"] as const).map((t) => (
+                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip", "replay3d", "piano", "spider", "setup"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -191,7 +192,9 @@ function WorkbenchPage() {
                                         ? "3D"
                                         : t === "piano"
                                           ? "Piano"
-                                          : "Spider"}
+                                          : t === "spider"
+                                            ? "Spider"
+                                            : "Setup"}
                       </button>
                     ))}
                   </div>
@@ -206,6 +209,7 @@ function WorkbenchPage() {
                     {bottomTab === "replay3d" && <ReplayThree parsed={parsed} />}
                     {bottomTab === "piano" && <PianoRoll parsed={parsed} />}
                     {bottomTab === "spider" && <SectorSpider parsed={parsed} />}
+                    {bottomTab === "setup" && <SetupSheet parsed={parsed} />}
                   </div>
                 </div>
               </div>
