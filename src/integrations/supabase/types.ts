@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      shared_laps: {
+        Row: {
+          cmp_lap: number | null
+          created_at: string
+          id: string
+          ref_lap: number | null
+          session_id: string
+          token: string
+          user_id: string
+          view_count: number
+        }
+        Insert: {
+          cmp_lap?: number | null
+          created_at?: string
+          id?: string
+          ref_lap?: number | null
+          session_id: string
+          token: string
+          user_id: string
+          view_count?: number
+        }
+        Update: {
+          cmp_lap?: number | null
+          created_at?: string
+          id?: string
+          ref_lap?: number | null
+          session_id?: string
+          token?: string
+          user_id?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_laps_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "telemetry_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telemetry_sessions: {
         Row: {
           best_lap_s: number | null
