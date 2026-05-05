@@ -514,22 +514,36 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             strokeWidth={2 / zoom}
           />
         ) : (
-          buildColoredSegments(
-            refLapBuilt.x,
-            refLapBuilt.y,
-            refLapBuilt.c,
-            built.cMin,
-            built.cMax,
-          ).map((s, i) => (
-            <path
-              key={i}
-              d={s.d}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2.4 / zoom}
-              strokeLinecap="round"
-            />
-          ))
+          (() => {
+            const sp = mapThicknessBySpeed ? refLapBuilt.speed : undefined;
+            let smin = 0, smax = 0;
+            if (sp && sp.length) {
+              smin = Infinity; smax = -Infinity;
+              for (let i = 0; i < sp.length; i++) {
+                if (sp[i] < smin) smin = sp[i];
+                if (sp[i] > smax) smax = sp[i];
+              }
+            }
+            return buildColoredSegments(
+              refLapBuilt.x,
+              refLapBuilt.y,
+              refLapBuilt.c,
+              built.cMin,
+              built.cMax,
+              sp,
+              smin,
+              smax,
+            ).map((s, i) => (
+              <path
+                key={i}
+                d={s.d}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={(2.4 * s.w) / zoom}
+                strokeLinecap="round"
+              />
+            ));
+          })()
         )}
       </>
     );
@@ -550,16 +564,36 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
           strokeWidth={2.4 / zoom}
         />
       ) : (
-        buildColoredSegments(avg.x, avg.y, avg.c, built.cMin, built.cMax).map((s, i) => (
-          <path
-            key={i}
-            d={s.d}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={2.8 / zoom}
-            strokeLinecap="round"
-          />
-        ))
+        (() => {
+          const sp = mapThicknessBySpeed ? avg.speed : undefined;
+          let smin = 0, smax = 0;
+          if (sp && sp.length) {
+            smin = Infinity; smax = -Infinity;
+            for (let i = 0; i < sp.length; i++) {
+              if (sp[i] < smin) smin = sp[i];
+              if (sp[i] > smax) smax = sp[i];
+            }
+          }
+          return buildColoredSegments(
+            avg.x,
+            avg.y,
+            avg.c,
+            built.cMin,
+            built.cMax,
+            sp,
+            smin,
+            smax,
+          ).map((s, i) => (
+            <path
+              key={i}
+              d={s.d}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={(2.8 * s.w) / zoom}
+              strokeLinecap="round"
+            />
+          ));
+        })()
       );
   }
 
