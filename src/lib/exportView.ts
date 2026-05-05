@@ -80,3 +80,53 @@ export function exportCanvasAsPng(canvas: HTMLCanvasElement, filename: string) {
     if (b) downloadBlob(b, filename);
   }, "image/png");
 }
+
+/** Combine multiple side-by-side SVGs into one composite PNG. */
+export async function exportSvgGroupAsPng(
+  svgs: SVGSVGElement[],
+  filename: string,
+  scale = 2,
+  gap = 16,
+) {
+  if (svgs.length === 0) return;
+  const items = svgs.map((s) => {
+    const vb = s.viewBox.baseVal;
+    const w = vb && vb.width ? vb.width : s.clientWidth || 300;
+    const h = vb && vb.height ? vb.height : s.clientHeight || 300;
+    return { svg: s, w, h, xml: inlineCssVars(s) };
+  });
+  const totalW = items.reduce((a, it) => a + it.w, 0) + gap * (items.length - 1);
+  const maxH = items.reduce((a, it) => Math.max(a, it.h), 0);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(totalW * scale);
+  canvas.height = Math.round(maxH * scale);
+  const ctx = canvas.getContext("2d")!;
+  const bg = getComputedStyle(svgs[0]).getPropertyValue("--background").trim() || "#1a1d21";
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  let xCursor = 0;
+  for (const it of items) {
+    const blob = new Blob([it.xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("svg load failed"));
+        img.src = url;
+      });
+      ctx.drawImage(img, xCursor * scale, 0, it.w * scale, it.h * scale);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    xCursor += it.w + gap;
+  }
+  await new Promise<void>((resolve) =>
+    canvas.toBlob((b) => {
+      if (b) downloadBlob(b, filename);
+      resolve();
+    }, "image/png"),
+  );
+}
