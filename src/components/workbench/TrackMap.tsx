@@ -640,7 +640,10 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
   };
   const zoomBy = (factor: number) => setZoom((z) => clampZoom(z * factor));
 
-  const colorChannel = mapColorBy !== "none" ? parsed.channels[mapColorBy] : undefined;
+  const colorChannel =
+    mapColorBy !== "none" && mapColorBy !== "DeltaT"
+      ? parsed.channels[mapColorBy]
+      : undefined;
 
   // ---------- Overlays ----------
   // Sector heatmap: per-sector, color the reference racing line by gain/loss vs
