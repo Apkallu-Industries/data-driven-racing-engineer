@@ -115,7 +115,7 @@ function lapTickAt(parsed: IbtParsed, lapNum: number | null, cursorTick: number)
 }
 
 export function ReplayThree({ parsed }: { parsed: IbtParsed }) {
-  const { cursorTick, refLap, cmpLap, setCursorTick, parsed: pp } = useWorkbench();
+  const { cursorTick, refLap, cmpLap, setCursorTick } = useWorkbench();
   const [showGhost, setShowGhost] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const geom = useMemo(() => buildTrackGeometry(parsed), [parsed]);
@@ -136,7 +136,9 @@ export function ReplayThree({ parsed }: { parsed: IbtParsed }) {
   // Slider scrubs cursor through the chosen reference lap (or full session if none).
   const refLapObj = refLap != null ? parsed.laps.find((l) => l.lap === refLap) : null;
   const sliderMin = refLapObj ? refLapObj.startTick : 0;
-  const sliderMax = refLapObj ? refLapObj.endTick : (pp ? pp.tickCount - 1 : 0);
+  const anyChannel = parsed.channelNames[0];
+  const totalTicks = anyChannel ? parsed.channels[anyChannel].data.length : 0;
+  const sliderMax = refLapObj ? refLapObj.endTick : Math.max(0, totalTicks - 1);
   const sliderVal = Math.max(sliderMin, Math.min(sliderMax, cursorTick));
 
   const handleExport = () => {
