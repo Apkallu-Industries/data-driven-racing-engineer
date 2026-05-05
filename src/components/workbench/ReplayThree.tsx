@@ -1,9 +1,11 @@
-import { useMemo, useRef, Suspense } from "react";
+import { useMemo, useRef, useState, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
+import { exportCanvasAsPng } from "@/lib/exportView";
+import { Download, Eye, EyeOff } from "lucide-react";
 
 /** Build a centered, scaled, elevation-aware track polyline from parsed data. */
 function buildTrackGeometry(parsed: IbtParsed) {
@@ -113,7 +115,9 @@ function lapTickAt(parsed: IbtParsed, lapNum: number | null, cursorTick: number)
 }
 
 export function ReplayThree({ parsed }: { parsed: IbtParsed }) {
-  const { cursorTick, refLap, cmpLap } = useWorkbench();
+  const { cursorTick, refLap, cmpLap, setCursorTick, parsed: pp } = useWorkbench();
+  const [showGhost, setShowGhost] = useState(true);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const geom = useMemo(() => buildTrackGeometry(parsed), [parsed]);
 
   if (!geom) {
@@ -125,18 +129,48 @@ export function ReplayThree({ parsed }: { parsed: IbtParsed }) {
   }
 
   const refTick = lapTickAt(parsed, refLap, cursorTick);
-  const cmpTick = cmpLap != null ? lapTickAt(parsed, cmpLap, cursorTick) : null;
+  const cmpTick = showGhost && cmpLap != null ? lapTickAt(parsed, cmpLap, cursorTick) : null;
   const refPos = carPosition(parsed, geom, refTick);
   const cmpPos = cmpTick != null ? carPosition(parsed, geom, cmpTick) : null;
 
+  // Slider scrubs cursor through the chosen reference lap (or full session if none).
+  const refLapObj = refLap != null ? parsed.laps.find((l) => l.lap === refLap) : null;
+  const sliderMin = refLapObj ? refLapObj.startTick : 0;
+  const sliderMax = refLapObj ? refLapObj.endTick : (pp ? pp.tickCount - 1 : 0);
+  const sliderVal = Math.max(sliderMin, Math.min(sliderMax, cursorTick));
+
+  const handleExport = () => {
+    const canvas = containerRef.current?.querySelector("canvas");
+    if (canvas) exportCanvasAsPng(canvas as HTMLCanvasElement, "replay-3d.png");
+  };
+
   return (
     <div className="flex h-full flex-col">
-      <div className="hairline-b flex items-center justify-between px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+      <div className="hairline-b flex items-center justify-between gap-2 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         <span>3D Replay {geom.hasAlt ? "· elevation" : "· flat (no alt channel)"}</span>
-        <span className="text-[10px]">drag to orbit · scroll to zoom</span>
+        <div className="flex items-center gap-2">
+          {cmpLap != null && (
+            <button
+              onClick={() => setShowGhost((g) => !g)}
+              className={`flex h-5 items-center gap-1 rounded-sm border border-border px-1.5 text-[10px] uppercase ${
+                showGhost ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Toggle ghost (compare lap)"
+            >
+              {showGhost ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />} Ghost
+            </button>
+          )}
+          <button
+            onClick={handleExport}
+            className="flex h-5 items-center gap-1 rounded-sm border border-border bg-rail px-1.5 text-[10px] uppercase text-muted-foreground hover:text-foreground"
+            title="Export PNG"
+          >
+            <Download className="h-3 w-3" /> PNG
+          </button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1">
-        <Canvas camera={{ position: [70, 50, 70], fov: 45 }} dpr={[1, 1.5]}>
+      <div ref={containerRef} className="min-h-0 flex-1">
+        <Canvas camera={{ position: [70, 50, 70], fov: 45 }} dpr={[1, 1.5]} gl={{ preserveDrawingBuffer: true }}>
           <Suspense fallback={null}>
             <color attach="background" args={["#16191d"]} />
             <fog attach="fog" args={["#16191d", 120, 260]} />
@@ -149,6 +183,20 @@ export function ReplayThree({ parsed }: { parsed: IbtParsed }) {
             <OrbitControls enableDamping makeDefault />
           </Suspense>
         </Canvas>
+      </div>
+      <div className="hairline-t flex items-center gap-2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="w-12">Scrub</span>
+        <input
+          type="range"
+          min={sliderMin}
+          max={sliderMax}
+          value={sliderVal}
+          onChange={(e) => setCursorTick(parseInt(e.target.value, 10))}
+          className="flex-1 accent-primary"
+        />
+        <span className="w-24 text-right tabular-nums">
+          {refLapObj ? `${(((sliderVal - sliderMin) / Math.max(1, sliderMax - sliderMin)) * 100).toFixed(0)}%` : `t=${sliderVal}`}
+        </span>
       </div>
     </div>
   );
