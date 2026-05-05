@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
+import { exportSvgGroupAsPng } from "@/lib/exportView";
+import { Download } from "lucide-react";
 
 const NUM_SECTORS = 3;
 
@@ -91,6 +93,7 @@ function normalize(value: number, axis: typeof AXES[number]["key"], scale: Recor
 
 export function SectorSpider({ parsed }: { parsed: IbtParsed }) {
   const { refLap, cmpLap } = useWorkbench();
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const ref = useMemo(
     () => (refLap != null ? lapSectorMetrics(parsed, refLap) : null),
     [parsed, refLap],
@@ -140,12 +143,26 @@ export function SectorSpider({ parsed }: { parsed: IbtParsed }) {
     <div className="flex h-full flex-col">
       <div className="hairline-b flex items-center justify-between px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         <span>Sector Spider</span>
-        <span className="text-[10px]">
-          ref L{refLap}
-          {cmpLap != null && ` · cmp L${cmpLap} (dashed)`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px]">
+            ref L{refLap}
+            {cmpLap != null && ` · cmp L${cmpLap} (dashed)`}
+          </span>
+          <button
+            onClick={() => {
+              const svgs = containerRef.current
+                ? Array.from(containerRef.current.querySelectorAll<SVGSVGElement>("svg"))
+                : [];
+              if (svgs.length) exportSvgGroupAsPng(svgs, "sector-spider.png");
+            }}
+            className="flex h-5 items-center gap-1 rounded-sm border border-border bg-rail px-1.5 font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground"
+            title="Export PNG"
+          >
+            <Download className="h-3 w-3" /> PNG
+          </button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2">
+      <div ref={containerRef} className="min-h-0 flex-1 overflow-auto p-2">
         <div className="grid grid-cols-3 gap-2">
           {ref.map((sec, sIdx) => {
             const refPts = polygonForSector(sec);

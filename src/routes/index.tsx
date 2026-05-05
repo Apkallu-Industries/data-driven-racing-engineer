@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Activity, Gauge, Layers, MapPin } from "lucide-react";
+import { useInstallPrompt } from "@/lib/installPrompt";
+import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -10,6 +12,7 @@ export const Route = createFileRoute("/")({
 function LandingPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { available: canInstall, promptInstall } = useInstallPrompt();
   useEffect(() => {
     if (!loading && user) navigate({ to: "/sessions" });
   }, [user, loading, navigate]);
@@ -70,6 +73,17 @@ function LandingPage() {
             >
               How it works
             </Link>
+            {canInstall && (
+              <button
+                onClick={() => promptInstall()}
+                className="flex items-center gap-2 rounded-sm border border-primary/60 bg-primary/10 px-5 py-3 text-sm text-primary hover:bg-primary/20"
+              >
+                <Download className="h-4 w-4" /> Install app
+                <span className="rounded-sm bg-primary/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">
+                  Recommended
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </section>

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useCallback } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench, type MapMode, type MapColorChannel } from "@/lib/store";
 import { Plus, Minus, Maximize2, Flame, Waves, GitCompare, Activity } from "lucide-react";
+import { ExportButton } from "./ExportButton";
 
 const W = 400;
 const H = 260;
@@ -881,6 +882,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
           >
             <Maximize2 className="h-3 w-3" />
           </button>
+          <ExportButton getSvg={() => svgRef.current} filenameBase="track-map" />
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden p-2">
