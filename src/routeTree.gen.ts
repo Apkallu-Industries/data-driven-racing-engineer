@@ -13,6 +13,7 @@ import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
+import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as SessionsIdRouteImport } from './routes/sessions.$id'
 
 const HowItWorksRoute = HowItWorksRouteImport.update({
@@ -35,6 +36,11 @@ const SessionsIndexRoute = SessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionsIdRoute = SessionsIdRouteImport.update({
   id: '/sessions/$id',
   path: '/sessions/$id',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
   '/sessions/$id': typeof SessionsIdRoute
+  '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
   '/sessions/$id': typeof SessionsIdRoute
+  '/share/$token': typeof ShareTokenRoute
   '/sessions': typeof SessionsIndexRoute
 }
 export interface FileRoutesById {
@@ -61,19 +69,33 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
   '/sessions/$id': typeof SessionsIdRoute
+  '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/how-it-works' | '/sessions/$id' | '/sessions/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/how-it-works'
+    | '/sessions/$id'
+    | '/share/$token'
+    | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/how-it-works' | '/sessions/$id' | '/sessions'
+  to:
+    | '/'
+    | '/auth'
+    | '/how-it-works'
+    | '/sessions/$id'
+    | '/share/$token'
+    | '/sessions'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/how-it-works'
     | '/sessions/$id'
+    | '/share/$token'
     | '/sessions/'
   fileRoutesById: FileRoutesById
 }
@@ -82,6 +104,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   HowItWorksRoute: typeof HowItWorksRoute
   SessionsIdRoute: typeof SessionsIdRoute
+  ShareTokenRoute: typeof ShareTokenRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
 }
 
@@ -115,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/share/$token': {
+      id: '/share/$token'
+      path: '/share/$token'
+      fullPath: '/share/$token'
+      preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sessions/$id': {
       id: '/sessions/$id'
       path: '/sessions/$id'
@@ -130,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   HowItWorksRoute: HowItWorksRoute,
   SessionsIdRoute: SessionsIdRoute,
+  ShareTokenRoute: ShareTokenRoute,
   SessionsIndexRoute: SessionsIndexRoute,
 }
 export const routeTree = rootRouteImport

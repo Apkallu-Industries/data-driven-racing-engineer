@@ -127,7 +127,7 @@ Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay r
 ### Tier 3 — Platform moat
 8. **Setup-aware analysis** ⬜ — parse iRacing setup export; correlate changes to outcomes
 9. **Live ingest via IRSDK/UDP** ⬜ — companion app → Lovable Cloud → real-time coaching
-10. **Shareable lap links** ⬜ — public read-only "lap card" with TrackMap + key stats
+10. **Shareable lap links** ✅ — `shared_laps` table + `/share/$token` public route. Owner-only `createShareLink`, public `getSharedLap` returns 1h signed `.ibt` URL. Read-only viewer renders TrackMap + 3D + Piano + Spider, locked to ref/cmp lap (`server/share.functions.ts`)
 
 ### Recently shipped (supporting)
 - g-g diagram, Optimal Lap, Counterfactual What-if with confidence scoring
