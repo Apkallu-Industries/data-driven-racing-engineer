@@ -953,18 +953,22 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         </div>
       )}
       {/* Color-channel legend */}
-      {mapColorBy !== "none" && built.kind !== "drift" && colorChannel && (
+      {mapColorBy !== "none" && built.kind !== "drift" && (colorChannel || mapColorBy === "DeltaT") && (
         <div className="hairline-t flex items-center gap-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span>{mapColorBy}</span>
-          <span className="tabular-nums">{built.cMin.toFixed(1)}</span>
+          <span>{mapColorBy === "DeltaT" ? "Δt vs ref" : mapColorBy}</span>
+          <span className="tabular-nums">
+            {mapColorBy === "DeltaT" ? `${built.cMin.toFixed(2)}s` : built.cMin.toFixed(1)}
+          </span>
           <span
             className="h-1.5 flex-1 rounded-full"
             style={{
               background: `linear-gradient(to right, ${rampColor(mapColorBy, 0)}, ${rampColor(mapColorBy, 0.5)}, ${rampColor(mapColorBy, 1)})`,
             }}
           />
-          <span className="tabular-nums">{built.cMax.toFixed(1)}</span>
-          {colorChannel.unit && <span>{colorChannel.unit}</span>}
+          <span className="tabular-nums">
+            {mapColorBy === "DeltaT" ? `+${built.cMax.toFixed(2)}s` : built.cMax.toFixed(1)}
+          </span>
+          {colorChannel?.unit && <span>{colorChannel.unit}</span>}
         </div>
       )}
     </div>
