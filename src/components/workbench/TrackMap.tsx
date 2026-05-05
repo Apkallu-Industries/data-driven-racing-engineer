@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useCallback } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench, type MapMode, type MapColorChannel } from "@/lib/store";
-import { Plus, Minus, Maximize2, Flame, Waves, GitCompare } from "lucide-react";
+import { Plus, Minus, Maximize2, Flame, Waves, GitCompare, Activity } from "lucide-react";
 
 const W = 400;
 const H = 260;
@@ -31,8 +31,11 @@ function buildLapsByDist(
   const lapDistPct = parsed.channels["LapDistPct"]?.data;
   if (!xy || !lapDistPct) return null;
 
+  // DeltaT is a derived channel computed after lap construction.
   const channelData =
-    channelName !== "none" ? parsed.channels[channelName]?.data : undefined;
+    channelName !== "none" && channelName !== "DeltaT"
+      ? parsed.channels[channelName]?.data
+      : undefined;
   const sessionTime = parsed.channels["SessionTime"]?.data;
 
   const laps: BuiltLap[] = [];
@@ -43,7 +46,8 @@ function buildLapsByDist(
     if (lap.endTick - lap.startTick < 60) continue;
     const x = new Float32Array(NUM_SAMPLES);
     const y = new Float32Array(NUM_SAMPLES);
-    const c = new Float32Array(channelData ? NUM_SAMPLES : 0);
+    const wantC = !!channelData || channelName === "DeltaT";
+    const c = new Float32Array(wantC ? NUM_SAMPLES : 0);
     const st = new Float32Array(sessionTime ? NUM_SAMPLES : 0);
 
     // Build a monotonic-ish list of (pct, tick) for this lap.
