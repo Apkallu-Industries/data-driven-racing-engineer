@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
-import { ExportButton } from "./ExportButton";
+import { exportSvgGroupAsPng } from "@/lib/exportView";
+import { Download } from "lucide-react";
 
 const NUM_SECTORS = 3;
 
@@ -147,7 +148,18 @@ export function SectorSpider({ parsed }: { parsed: IbtParsed }) {
             ref L{refLap}
             {cmpLap != null && ` · cmp L${cmpLap} (dashed)`}
           </span>
-          <ExportSpiderButton containerRef={containerRef} />
+          <button
+            onClick={() => {
+              const svgs = containerRef.current
+                ? Array.from(containerRef.current.querySelectorAll<SVGSVGElement>("svg"))
+                : [];
+              if (svgs.length) exportSvgGroupAsPng(svgs, "sector-spider.png");
+            }}
+            className="flex h-5 items-center gap-1 rounded-sm border border-border bg-rail px-1.5 font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground"
+            title="Export PNG"
+          >
+            <Download className="h-3 w-3" /> PNG
+          </button>
         </div>
       </div>
       <div ref={containerRef} className="min-h-0 flex-1 overflow-auto p-2">
