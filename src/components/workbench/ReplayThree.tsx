@@ -85,14 +85,12 @@ function TrackLine({ positions, color }: { positions: Float32Array; color: strin
     g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     return g;
   }, [positions]);
-  return (
-    // @ts-expect-error R3F three element typing
-    <line>
-      <primitive object={geom} attach="geometry" />
-      <lineBasicMaterial color={color} linewidth={2} />
-    {/* @ts-expect-error R3F three element typing */}
-    </line>
+  const material = useMemo(
+    () => new THREE.LineBasicMaterial({ color }),
+    [color],
   );
+  const lineObj = useMemo(() => new THREE.Line(geom, material), [geom, material]);
+  return <primitive object={lineObj} />;
 }
 
 /** Find tick within the chosen lap's range matching cursor offset. */
