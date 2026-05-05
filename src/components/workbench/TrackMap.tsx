@@ -810,8 +810,18 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
             <option value="Speed">Speed</option>
             <option value="RPM">RPM</option>
             <option value="Gear">Gear</option>
+            <option value="DeltaT">Δt vs ref</option>
           </select>
           <div className="flex items-center gap-px overflow-hidden rounded-sm border border-border">
+            <button
+              onClick={() => setMapThicknessBySpeed(!mapThicknessBySpeed)}
+              className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase ${
+                mapThicknessBySpeed ? "bg-primary text-primary-foreground" : "bg-rail text-muted-foreground hover:text-foreground"
+              }`}
+              title="Line thickness driven by speed"
+            >
+              <Activity className="h-3 w-3" /> Thick
+            </button>
             <button
               onClick={() => setShowSectorHeat(!showSectorHeat)}
               className={`flex h-5 items-center gap-1 px-1.5 font-mono text-[10px] uppercase ${
