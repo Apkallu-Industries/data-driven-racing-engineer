@@ -133,6 +133,10 @@ Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay r
 - g-g diagram, Optimal Lap, Counterfactual What-if with confidence scoring
 - AI Coach (single/compare/session, brief/detailed toggle)
 - Security hardening: RLS audit fixes, CSP headers
+- Installable PWA (manifest-only, no SW) + "Install app" CTA on landing
+- Cross-panel sticky ref/cmp lap selector (workbench header drives TrackMap, 3D, Piano, Spider)
+- 3D ghost toggle + sync-scrub slider (cursor mapped via LapDistPct)
+- Export buttons: TrackMap (PNG/SVG), Piano (PNG/SVG), Spider (PNG composite), 3D (PNG)
 
 ### Suggested next sprint
 1. Physics counterfactual ("brake 5m later → +Δs") on top of existing What-if zones
