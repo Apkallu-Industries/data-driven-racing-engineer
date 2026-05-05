@@ -119,10 +119,10 @@ Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay r
    - Cluster style across sessions; compare to past self / anonymised community baseline
 
 ### Tier 2 — Visualisation
-4. **3D track replay** (Three.js / R3F) ⬜ — elevation-aware, ghost compare car
-5. **Heatmap minimap with time-delta gradient** 🟡 — TrackMap colors by channel; missing thickness=speed + Δt color
-6. **Brake/throttle "piano roll"** ⬜ — MIDI-style stacked pedal bars across N laps
-7. **Sector "spider" radar** ⬜ — per-sector polygon (entry/min/exit speed, brake G, throttle-on, steer smoothness)
+4. **3D track replay** (Three.js / R3F) ✅ — elevation-aware (uses Alt channel when present), ref + ghost compare car, orbit/zoom (`ReplayThree.tsx`)
+5. **Heatmap minimap with time-delta gradient** ✅ — TrackMap now supports Δt-vs-ref color mode + speed-driven line thickness toggle
+6. **Brake/throttle "piano roll"** ✅ — MIDI-style stacked throttle/brake bars across distance for N laps (`PianoRoll.tsx`)
+7. **Sector "spider" radar** ✅ — per-sector polygons: entry/min/exit speed, brake G, throttle-on, steer smoothness, ref vs cmp (`SectorSpider.tsx`)
 
 ### Tier 3 — Platform moat
 8. **Setup-aware analysis** ⬜ — parse iRacing setup export; correlate changes to outcomes
