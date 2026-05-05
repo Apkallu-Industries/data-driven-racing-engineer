@@ -392,10 +392,20 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
 
   // Build colored line as N short segments. Returns array of {d, color}.
   const buildColoredSegments = useCallback(
-    (x: Float32Array, y: Float32Array, c: Float32Array, cMin: number, cMax: number) => {
+    (
+      x: Float32Array,
+      y: Float32Array,
+      c: Float32Array,
+      cMin: number,
+      cMax: number,
+      speed?: Float32Array,
+      speedMin?: number,
+      speedMax?: number,
+    ) => {
       if (!projection) return [];
-      const segs: { d: string; color: string }[] = [];
+      const segs: { d: string; color: string; w: number }[] = [];
       const step = Math.max(1, Math.floor(x.length / 250)); // ~250 segments
+      const sRange = (speedMax ?? 0) - (speedMin ?? 0);
       for (let i = 0; i < x.length - step; i += step) {
         const x0 = projection.px(x[i]);
         const y0 = projection.py(y[i]);
@@ -403,7 +413,14 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
         const y1 = projection.py(y[i + step]);
         const v = c.length ? (c[i] + c[i + step]) / 2 : 0;
         const t = (v - cMin) / Math.max(1e-6, cMax - cMin);
-        segs.push({ d: `M ${x0} ${y0} L ${x1} ${y1}`, color: rampColor(mapColorBy, t) });
+        let w = 1;
+        if (speed && speed.length && sRange > 0) {
+          const sv = (speed[i] + speed[i + step]) / 2;
+          const sn = Math.max(0, Math.min(1, (sv - (speedMin ?? 0)) / sRange));
+          // Map speed → 0.6×..1.8× nominal width.
+          w = 0.6 + sn * 1.2;
+        }
+        segs.push({ d: `M ${x0} ${y0} L ${x1} ${y1}`, color: rampColor(mapColorBy, t), w });
       }
       return segs;
     },
