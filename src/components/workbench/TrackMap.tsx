@@ -20,6 +20,8 @@ interface BuiltLap {
   timeS: number;
   /** Session-time offset per bin, used to derive sector splits. */
   st: Float32Array;
+  /** Speed value per bin (used for line thickness). Empty if Speed not present. */
+  speed: Float32Array;
 }
 
 /** Build per-lap resampled XY using LapDistPct as the abscissa. */
@@ -37,6 +39,7 @@ function buildLapsByDist(
       ? parsed.channels[channelName]?.data
       : undefined;
   const sessionTime = parsed.channels["SessionTime"]?.data;
+  const speedData = parsed.channels["Speed"]?.data;
 
   const laps: BuiltLap[] = [];
   let cMin = Infinity;
@@ -49,6 +52,7 @@ function buildLapsByDist(
     const wantC = !!channelData || channelName === "DeltaT";
     const c = new Float32Array(wantC ? NUM_SAMPLES : 0);
     const st = new Float32Array(sessionTime ? NUM_SAMPLES : 0);
+    const speed = new Float32Array(speedData ? NUM_SAMPLES : 0);
 
     // Build a monotonic-ish list of (pct, tick) for this lap.
     // Filter out the wrap from ~1 -> 0 at the line.
@@ -86,6 +90,9 @@ function buildLapsByDist(
       if (sessionTime) {
         st[i] = sessionTime[t0] * (1 - ff) + sessionTime[t1] * ff;
       }
+      if (speedData) {
+        speed[i] = speedData[t0] * (1 - ff) + speedData[t1] * ff;
+      }
     }
 
     // Re-anchor each lap so it starts at (0,0). Cheap drift cleanup that
@@ -96,7 +103,7 @@ function buildLapsByDist(
       y[i] -= y0;
     }
 
-    laps.push({ x, y, c, lap: lap.lap, timeS: lap.timeS, st });
+    laps.push({ x, y, c, lap: lap.lap, timeS: lap.timeS, st, speed });
   }
 
   if (!isFinite(cMin)) cMin = 0;
