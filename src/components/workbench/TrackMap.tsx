@@ -139,6 +139,8 @@ function averageLaps(laps: BuiltLap[]): {
   meanDev: Float32Array;
   /** Per-bin mean heading error in radians vs the averaged tangent. */
   meanHead: Float32Array;
+  /** Per-bin averaged speed across laps (empty if speed not available). */
+  speed: Float32Array;
 } | null {
   if (laps.length === 0) return null;
   const n = laps[0].x.length;
@@ -146,6 +148,8 @@ function averageLaps(laps: BuiltLap[]): {
   const ay = new Float32Array(n);
   const ac = new Float32Array(n);
   const hasC = laps[0].c.length === n;
+  const hasSpeed = laps[0].speed && laps[0].speed.length === n;
+  const aspeed = new Float32Array(hasSpeed ? n : 0);
   let count = 0;
   // First pass: averaged centerline.
   const closedLaps: { x: Float32Array; y: Float32Array }[] = [];
@@ -156,6 +160,7 @@ function averageLaps(laps: BuiltLap[]): {
       ax[i] += closed.x[i];
       ay[i] += closed.y[i];
       if (hasC) ac[i] += lap.c[i];
+      if (hasSpeed) aspeed[i] += lap.speed[i];
     }
     count++;
   }
@@ -163,6 +168,7 @@ function averageLaps(laps: BuiltLap[]): {
     ax[i] /= count;
     ay[i] /= count;
     if (hasC) ac[i] /= count;
+    if (hasSpeed) aspeed[i] /= count;
   }
 
   // Second pass: per-bin perpendicular spread & heading error vs the avg tangent.
@@ -199,7 +205,7 @@ function averageLaps(laps: BuiltLap[]): {
     meanDev[i] = sumAbs / closedLaps.length;
     meanHead[i] = sumHead / closedLaps.length;
   }
-  return { x: ax, y: ay, c: ac, spread, meanDev, meanHead };
+  return { x: ax, y: ay, c: ac, spread, meanDev, meanHead, speed: aspeed };
 }
 
 /** Compute per-sector times for one lap using LapDistPct boundaries (1/3, 2/3). */
