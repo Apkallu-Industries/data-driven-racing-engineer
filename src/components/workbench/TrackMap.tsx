@@ -362,7 +362,7 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
       cMin: lapsBuilt.cMin,
       cMax: lapsBuilt.cMax,
     };
-  }, [parsed, xy, mapMode, mapColorBy]);
+  }, [parsed, xy, mapMode, mapColorBy, refLap]);
 
   const projection = useMemo(() => {
     if (!built) return null;
