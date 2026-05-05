@@ -20,6 +20,7 @@ import { AICoach } from "@/components/workbench/AICoach";
 import { ReplayThree } from "@/components/workbench/ReplayThree";
 import { PianoRoll } from "@/components/workbench/PianoRoll";
 import { SectorSpider } from "@/components/workbench/SectorSpider";
+import { ShareButton } from "@/components/workbench/ShareButton";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -128,6 +129,7 @@ function WorkbenchPage() {
                 ))}
               </select>
             </label>
+            <ShareButton sessionId={id} />
           </>
         )}
       </AppHeader>
