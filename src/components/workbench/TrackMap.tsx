@@ -297,6 +297,32 @@ export function TrackMap({ parsed }: { parsed: IbtParsed }) {
     const lapsBuilt = buildLapsByDist(parsed, mapColorBy);
     if (!lapsBuilt || lapsBuilt.laps.length === 0) return null;
 
+    // For DeltaT mode, compute per-bin cumulative time delta vs the reference lap.
+    if (mapColorBy === "DeltaT") {
+      const ref =
+        lapsBuilt.laps.find((l) => l.lap === refLap) ?? lapsBuilt.laps[0];
+      if (ref && ref.st.length === ref.x.length) {
+        let dMin = Infinity, dMax = -Infinity;
+        const t0Ref = ref.st[0];
+        for (const lap of lapsBuilt.laps) {
+          if (lap.st.length !== lap.x.length || lap.c.length !== lap.x.length) continue;
+          const t0Lap = lap.st[0];
+          for (let i = 0; i < lap.x.length; i++) {
+            const lapDt = lap.st[i] - t0Lap;
+            const refDt = ref.st[i] - t0Ref;
+            const d = lapDt - refDt; // positive = slower than ref
+            lap.c[i] = d;
+            if (d < dMin) dMin = d;
+            if (d > dMax) dMax = d;
+          }
+        }
+        // Symmetric range so 0 sits at the middle of the diverging ramp.
+        const m = Math.max(Math.abs(dMin), Math.abs(dMax), 0.05);
+        lapsBuilt.cMin = -m;
+        lapsBuilt.cMax = m;
+      }
+    }
+
     if (mapMode === "averaged") {
       const avg = averageLaps(lapsBuilt.laps);
       if (!avg) return null;
