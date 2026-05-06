@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as FingerprintRouteImport } from './routes/fingerprint'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
@@ -21,6 +22,11 @@ import { Route as ApiPublicOgShareTokenRouteImport } from './routes/api/public/o
 const HowItWorksRoute = HowItWorksRouteImport.update({
   id: '/how-it-works',
   path: '/how-it-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FingerprintRoute = FingerprintRouteImport.update({
+  id: '/fingerprint',
+  path: '/fingerprint',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -62,6 +68,7 @@ const ApiPublicOgShareTokenRoute = ApiPublicOgShareTokenRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/fingerprint'
     | '/how-it-works'
     | '/lab/lapfile'
     | '/sessions/$id'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/fingerprint'
     | '/how-it-works'
     | '/lab/lapfile'
     | '/sessions/$id'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/fingerprint'
     | '/how-it-works'
     | '/lab/lapfile'
     | '/sessions/$id'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  FingerprintRoute: typeof FingerprintRoute
   HowItWorksRoute: typeof HowItWorksRoute
   LabLapfileRoute: typeof LabLapfileRoute
   SessionsIdRoute: typeof SessionsIdRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/how-it-works'
       fullPath: '/how-it-works'
       preLoaderRoute: typeof HowItWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fingerprint': {
+      id: '/fingerprint'
+      path: '/fingerprint'
+      fullPath: '/fingerprint'
+      preLoaderRoute: typeof FingerprintRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  FingerprintRoute: FingerprintRoute,
   HowItWorksRoute: HowItWorksRoute,
   LabLapfileRoute: LabLapfileRoute,
   SessionsIdRoute: SessionsIdRoute,
