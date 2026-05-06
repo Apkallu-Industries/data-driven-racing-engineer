@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Activity, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { ThemeEditor } from "@/components/ThemeEditor";
 
 export function AppHeader({ children }: { children?: React.ReactNode }) {
   const { user, signOut } = useAuth();
@@ -17,6 +18,7 @@ export function AppHeader({ children }: { children?: React.ReactNode }) {
       <div className="flex flex-1 items-center gap-3 text-xs text-muted-foreground">{children}</div>
       <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
         <span className="font-mono">{user?.email}</span>
+        <ThemeEditor />
         <button
           className="flex items-center gap-1.5 rounded-sm px-2 py-1 hover:bg-accent hover:text-foreground"
           onClick={async () => {
