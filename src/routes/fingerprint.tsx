@@ -15,6 +15,7 @@ import {
 } from "@/lib/fingerprint/compute";
 import { formatLapTime } from "@/lib/lapfile/parser";
 import { classifyCar, type CarClass } from "@/lib/fingerprint/carClass";
+import { loadTargets, saveTargets, pairKey, parseLapInput, type TargetMap } from "@/lib/fingerprint/targets";
 
 export const Route = createFileRoute("/fingerprint")({
   head: () => ({
@@ -66,6 +67,8 @@ function ClassScoreCard({
     totalFiles: number;
     improvement: number | null;
     sigma: number | null;
+    wrPct: number | null;
+    targetsSet: number;
     score: number;
     bestPair: TrackCarFingerprint;
   };
@@ -112,6 +115,19 @@ function ClassScoreCard({
           <div className="text-foreground tabular-nums">{formatLapTime(c.bestPair.bestEverS)}</div>
         </div>
       </div>
+      <div className="mt-2 flex items-baseline justify-between font-mono text-[10px]">
+        <span className="text-muted-foreground/70">vs Target</span>
+        <span className="tabular-nums">
+          {c.wrPct != null ? (
+            <span className={c.wrPct >= 99 ? "text-emerald-400" : c.wrPct >= 97 ? "text-lime-400" : c.wrPct >= 94 ? "text-amber-400" : "text-rose-400"}>
+              {c.wrPct.toFixed(1)}%
+              <span className="ml-1 text-muted-foreground">({c.targetsSet} set)</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">no targets</span>
+          )}
+        </span>
+      </div>
       <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
         {c.bestPair.track} · {c.bestPair.car}
       </div>
@@ -124,6 +140,19 @@ function FingerprintPage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [targets, setTargets] = useState<TargetMap>(() => loadTargets());
+
+  const setTarget = useCallback((track: string, car: string, raw: string) => {
+    setTargets((prev) => {
+      const next = { ...prev };
+      const k = pairKey(track, car);
+      const parsed = parseLapInput(raw);
+      if (parsed == null) delete next[k];
+      else next[k] = parsed;
+      saveTargets(next);
+      return next;
+    });
+  }, []);
 
   const ingest = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -221,7 +250,17 @@ function FingerprintPage() {
       const impScore = improvement != null ? improvement * 100 : 50; // unknown → neutral
       const conScore = sigma != null ? Math.max(0, 100 - sigma * 100) : 50;
       const varScore = Math.min(100, tracks * 10 + cars * 5);
-      const score = +(0.5 * impScore + 0.35 * conScore + 0.15 * varScore).toFixed(1);
+      // WR-gap: of pairs in this class with a target set, median (target / yourBest) * 100.
+      // 100 = matching the target, lower = slower than target.
+      const withTarget = ps
+        .map((p) => ({ p, t: targets[pairKey(p.track, p.car)] }))
+        .filter((x): x is { p: TrackCarFingerprint; t: number } => !!x.t && x.p.bestEverS > 0);
+      const wrPct = withTarget.length
+        ? median(withTarget.map((x) => Math.min(1, x.t / x.p.bestEverS) * 100))
+        : null;
+      const wrScore = wrPct != null ? wrPct : 50; // unknown → neutral
+      // 40% WR-gap, 25% peak, 20% consistency, 15% variety
+      const score = +(0.4 * wrScore + 0.25 * impScore + 0.2 * conScore + 0.15 * varScore).toFixed(1);
       const bestPair = [...ps].sort((a, b) => a.bestEverS - b.bestEverS)[0];
       return {
         cls,
@@ -231,12 +270,14 @@ function FingerprintPage() {
         totalFiles,
         improvement,
         sigma,
+        wrPct,
+        targetsSet: withTarget.length,
         score,
         bestPair,
       };
     });
     return out.sort((a, b) => b.score - a.score);
-  }, [fp]);
+  }, [fp, targets]);
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -392,7 +433,8 @@ function FingerprintPage() {
                   ))}
                 </div>
                 <div className="hairline-t px-3 py-2 font-mono text-[10px] text-muted-foreground">
-                  Score = 50 % closeness-to-peak (best ÷ typical) · 35 % consistency (lower σ) · 15 % variety (tracks + cars).
+                  Score = 40 % WR-gap (target ÷ your best) · 25 % closeness-to-peak · 20 % consistency · 15 % variety.
+                  Set targets in the table below — paste from iRacing forums, friends' best laps, or league records.
                 </div>
               </div>
             )}
@@ -413,11 +455,16 @@ function FingerprintPage() {
                       <th className="px-2 py-1.5 text-right">Best</th>
                       <th className="px-2 py-1.5 text-right">Median</th>
                       <th className="px-2 py-1.5 text-right">σ</th>
+                      <th className="px-2 py-1.5 text-right">Target</th>
+                      <th className="px-2 py-1.5 text-right">Δ WR</th>
                       <th className="px-2 py-1.5 text-center">Trend</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPairs.map((p, i) => {
+                      const t = targets[pairKey(p.track, p.car)];
+                      const gap = t ? p.bestEverS - t : null;
+                      const pct = t ? (t / p.bestEverS) * 100 : null;
                       return (
                         <tr key={i} className="hairline-b hover:bg-accent/30">
                           <td className="px-2 py-1 text-left">{p.track}</td>
@@ -432,6 +479,41 @@ function FingerprintPage() {
                           </td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
                             {p.bestStdevS.toFixed(3)}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            <input
+                              type="text"
+                              defaultValue={t ? formatLapTime(t) : ""}
+                              placeholder="1:23.456"
+                              onBlur={(e) => setTarget(p.track, p.car, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="w-20 rounded-sm border border-border bg-rail/50 px-1.5 py-0.5 text-right font-mono text-[11px] tabular-nums focus:border-primary focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            {gap != null && pct != null ? (
+                              <span
+                                className={
+                                  gap <= 0.05
+                                    ? "text-emerald-400"
+                                    : gap <= 0.5
+                                      ? "text-lime-400"
+                                      : gap <= 1.5
+                                        ? "text-amber-400"
+                                        : "text-rose-400"
+                                }
+                              >
+                                {gap > 0 ? "+" : ""}
+                                {gap.toFixed(3)}s
+                                <span className="ml-1 text-[10px] text-muted-foreground">
+                                  ({pct.toFixed(1)}%)
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="px-2 py-1 text-center">{trendIcon(p.trend)}</td>
                         </tr>
