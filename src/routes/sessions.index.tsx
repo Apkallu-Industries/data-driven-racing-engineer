@@ -99,6 +99,9 @@ function SessionsPage() {
         <Link to="/lab/lapfile" className="ml-3 text-muted-foreground hover:text-foreground">
           Lapfile Lab
         </Link>
+        <Link to="/fingerprint" className="ml-3 text-muted-foreground hover:text-foreground">
+          Fingerprint
+        </Link>
       </AppHeader>
 
       <main className="mx-auto max-w-7xl p-6">
