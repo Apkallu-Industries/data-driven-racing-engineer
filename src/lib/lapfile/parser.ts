@@ -246,12 +246,14 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
   const channels: LapfileChannel[] = [];
   if (numBins <= 0 || numChannels <= 0) return channels;
   const channelByteLen = numBins * 4;
-  // CONFIRMED across 9 Talladega files (1068 bins, 14 channels):
-  //   ch00              = distance ramp (m)              — span 2× track length
-  //   ch01..ch06        = best-lap cumulative-time bands at 6 sub-segment scales
-  //   ch07              = steering angle (radians, ±π)
-  //   ch08..ch13        = optimal-lap cumulative-time bands (mirror of 01..06)
-  // Trailer = remaining bytes after channels (≈ 80B sector/lap-times block).
+  // CONFIRMED across 18 Talladega files (1068 bins, 14 channels, 52-B trailer):
+  //   ch00              = distance ramp (m), spans 2× track length (bin stride 4 m)
+  //   ch01..ch06        = best-lap cumulative time at 6 progressive split points (s)
+  //   ch07              = optimal-lap cumulative time at split-6 (mirrors ch06 to ±0.1%)
+  //   ch08..ch13        = optimal-lap cumulative time at splits 1..6 (s)
+  //   ch06 ≈ ch07 ≈ best_lap / 2  (2-lap binned span)
+  //   −π ≈ -3.14159 in early bins is a "no-data" sentinel, not a steering angle.
+  // Trailer = 52 bytes after channels (sector-times block, 3 sectors).
   const totalChannels = Math.floor((raw.byteLength - bodyOffset) / channelByteLen);
   const PAIRED_LABELS = [
     "distance",        // 0
@@ -261,7 +263,7 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
     "best.t.seg4",     // 4
     "best.t.seg5",     // 5
     "best.t.seg6",     // 6
-    "steering",        // 7
+    "opt.t.seg6.dup",  // 7  (mirror of best/opt seg6 — confirmed)
     "opt.t.seg1",      // 8
     "opt.t.seg2",      // 9
     "opt.t.seg3",      // 10
@@ -269,7 +271,7 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
     "opt.t.seg5",      // 12
     "opt.t.seg6",      // 13
   ];
-  const PAIRED_UNITS = ["m","s","s","s","s","s","s","rad","s","s","s","s","s","s"];
+  const PAIRED_UNITS = ["m","s","s","s","s","s","s","s","s","s","s","s","s","s"];
   for (let c = 0; c < totalChannels; c++) {
     const off = bodyOffset + c * channelByteLen;
     if (off + channelByteLen > raw.byteLength) break;
