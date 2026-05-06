@@ -1,0 +1,1 @@
+ALTER TABLE public.telemetry_sessions ADD COLUMN IF NOT EXISTS setup_yaml text;
