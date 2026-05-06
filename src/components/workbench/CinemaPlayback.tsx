@@ -25,6 +25,33 @@ function fmtTime(s: number): string {
   return m > 0 ? `${m}:${r.toFixed(2).padStart(5, "0")}` : r.toFixed(2);
 }
 
+/** Hover overlay listing the channel name + live value/unit for a widget. */
+function WidgetInfo({
+  items,
+}: {
+  items: { label: string; channel: string | undefined; value: number | undefined; unit?: string; fmt?: (v: number) => string }[];
+}) {
+  return (
+    <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 min-w-[160px] rounded-sm border border-border bg-panel/95 p-1.5 font-mono text-[10px] opacity-0 shadow-lg backdrop-blur-sm transition-opacity duration-100 group-hover:opacity-100">
+      {items.map((it) => (
+        <div key={it.label} className="flex items-baseline justify-between gap-2 py-0.5">
+          <span className="uppercase tracking-wider text-muted-foreground">{it.label}</span>
+          <span className="flex flex-col items-end leading-tight">
+            <span className="tabular-nums text-foreground">
+              {it.value == null || !isFinite(it.value)
+                ? "—"
+                : (it.fmt ? it.fmt(it.value) : it.value.toFixed(2)) + (it.unit ? ` ${it.unit}` : "")}
+            </span>
+            <span className="text-[9px] text-muted-foreground/80">
+              {it.channel || "—"}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
   const {
     cursorTick,
@@ -75,6 +102,8 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
   const lapPct = clamp01(v(cfg.lapPct) ?? 0);
   const fuelL = v(cfg.fuel);
   const lapNum = currentLap?.lap ?? 0;
+  const unitOf = (slot: string | undefined) =>
+    slot && ch[slot] ? ch[slot].unit : undefined;
 
   // RPM arc (0–270°, sweeping clockwise from south-west).
   const rpmFrac = clamp01(rpm / Math.max(1, rpmMax));
@@ -152,7 +181,14 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.2fr_1fr_1fr] gap-px overflow-hidden bg-border/40">
         {/* RPM arc + huge speed */}
-        <div className="relative flex items-center justify-center bg-panel">
+        <div className="group relative flex items-center justify-center bg-panel">
+          <WidgetInfo
+            items={[
+              { label: "Speed", channel: cfg.speed, value: speedDisplay, unit: speedUnitLabel.toLowerCase(), fmt: (x) => x.toFixed(1) },
+              { label: "RPM", channel: cfg.rpm, value: rpm, unit: "rpm", fmt: (x) => x.toFixed(0) },
+              { label: "Gear", channel: cfg.gear, value: gear, fmt: (x) => (x === 0 ? "N" : x === -1 ? "R" : String(x)) },
+            ]}
+          />
           <svg viewBox="0 0 200 200" className="h-full w-full max-h-[280px] p-2">
             <path d={arcBgPath} fill="none" stroke="var(--border-strong)" strokeWidth={6} strokeLinecap="round" opacity={0.5} />
             <path
@@ -199,7 +235,15 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
         </div>
 
         {/* Steering + pedals */}
-        <div className="relative flex flex-col items-center justify-center gap-3 bg-panel p-3">
+        <div className="group relative flex flex-col items-center justify-center gap-3 bg-panel p-3">
+          <WidgetInfo
+            items={[
+              { label: "Steer", channel: cfg.steer, value: (steerRad * 180) / Math.PI, unit: "°", fmt: (x) => x.toFixed(0) },
+              { label: "Throttle", channel: cfg.throttle, value: throttle * 100, unit: "%", fmt: (x) => x.toFixed(0) },
+              { label: "Brake", channel: cfg.brake, value: brake * 100, unit: "%", fmt: (x) => x.toFixed(0) },
+              { label: "Clutch", channel: cfg.clutch, value: clutch * 100, unit: "%", fmt: (x) => x.toFixed(0) },
+            ]}
+          />
           <svg viewBox="0 0 120 120" className="h-32 w-32">
             <g style={{ transform: `rotate(${steerDeg}deg)`, transformOrigin: "60px 60px", transition: "transform 50ms linear" }}>
               <circle cx={60} cy={60} r={48} fill="none" stroke="var(--border-strong)" strokeWidth={3} />
@@ -232,7 +276,16 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
         </div>
 
         {/* G-dot + lap-progress + fuel */}
-        <div className="flex flex-col items-center justify-center gap-2 bg-panel p-3">
+        <div className="group relative flex flex-col items-center justify-center gap-2 bg-panel p-3">
+          <WidgetInfo
+            items={[
+              { label: "Lat G", channel: cfg.latG, value: latG, unit: "g", fmt: (x) => (x >= 0 ? "+" : "") + x.toFixed(2) },
+              { label: "Long G", channel: cfg.longG, value: longG, unit: "g", fmt: (x) => (x >= 0 ? "+" : "") + x.toFixed(2) },
+              { label: "Lap %", channel: cfg.lapPct, value: lapPct * 100, unit: "%", fmt: (x) => x.toFixed(1) },
+              { label: "Fuel", channel: cfg.fuel, value: fuelL, unit: unitOf(cfg.fuel) || "L", fmt: (x) => x.toFixed(2) },
+              { label: "Lap time", channel: cfg.lapTime, value: lapTime, unit: "s", fmt: (x) => fmtTime(x) },
+            ]}
+          />
           <div className="relative">
             <svg viewBox="0 0 100 100" className="h-32 w-32">
               <circle cx={50} cy={50} r={48} fill="none" stroke="var(--border-strong)" strokeWidth={1} />
