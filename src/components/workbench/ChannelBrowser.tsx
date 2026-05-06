@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench, colorForChannel } from "@/lib/store";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
+import { catalogEntry, ESSENTIAL_CHANNELS } from "@/lib/ibt/channelCatalog";
 
 export function ChannelBrowser({ parsed }: { parsed: IbtParsed }) {
   const { selectedChannels, toggleChannel, cursorTick } = useWorkbench();
@@ -10,12 +11,23 @@ export function ChannelBrowser({ parsed }: { parsed: IbtParsed }) {
 
   const grouped = useMemo(() => {
     const groups: Record<string, string[]> = {};
+    // Essentials pinned section: catalog-ordered, only channels actually present.
+    const essentials = ESSENTIAL_CHANNELS.filter((n) => parsed.channels[n] && (!q || n.toLowerCase().includes(q.toLowerCase())));
+    if (essentials.length) groups["Essentials"] = essentials;
     for (const name of parsed.channelNames) {
       if (q && !name.toLowerCase().includes(q.toLowerCase())) continue;
-      const g = parsed.channels[name].group;
+      const cat = catalogEntry(name);
+      const g = cat?.group ?? parsed.channels[name].group;
       (groups[g] ??= []).push(name);
     }
-    return groups;
+    // Stable order: Essentials first, then alphabetic.
+    const ordered: Record<string, string[]> = {};
+    if (groups["Essentials"]) ordered["Essentials"] = groups["Essentials"];
+    Object.keys(groups)
+      .filter((g) => g !== "Essentials")
+      .sort()
+      .forEach((g) => (ordered[g] = groups[g]));
+    return ordered;
   }, [parsed, q]);
 
   return (
@@ -50,10 +62,12 @@ export function ChannelBrowser({ parsed }: { parsed: IbtParsed }) {
                     const ch = parsed.channels[name];
                     const sel = selectedChannels.includes(name);
                     const v = ch.data[cursorTick] ?? 0;
+                    const cat = catalogEntry(name);
                     return (
                       <li key={name}>
                         <button
                           onClick={() => toggleChannel(name)}
+                          title={cat?.desc ?? ch.desc ?? name}
                           className={`flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-accent ${sel ? "bg-accent/60" : ""}`}
                         >
                           <span
