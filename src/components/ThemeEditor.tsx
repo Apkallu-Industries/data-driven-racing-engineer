@@ -15,7 +15,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTheme } from "@/lib/themeContext";
-import { DARK_THEME, PRESETS, THEME_GROUPS, type ThemeMap, type ThemeTokenKey } from "@/lib/theme";
+import {
+  DARK_THEME,
+  PRESETS,
+  THEME_GROUPS,
+  THEME_SCHEMA_VERSION,
+  buildThemeFile,
+  migrateThemeFile,
+  type ThemeMap,
+  type ThemeTokenKey,
+} from "@/lib/theme";
 import { ThemeCard, type ThemeCardData } from "@/components/ThemeCard";
 import { useAuth } from "@/lib/auth";
 import {
@@ -90,11 +99,11 @@ export function ThemeEditor() {
 
   const exportTheme = () => {
     const merged: ThemeMap = { ...DARK_THEME, ...theme };
-    const payload = {
-      $schema: "apextrace.theme/v1",
+    const payload = buildThemeFile({
       name: shareName || "My Theme",
-      theme: merged,
-    };
+      description: shareDesc || null,
+      theme: merged as Required<ThemeMap>,
+    });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -128,12 +137,25 @@ export function ThemeEditor() {
       return;
     }
 
+    // Migrate older schema versions forward before validating.
+    let migrated;
+    try {
+      migrated = migrateThemeFile(parsed);
+    } catch (e: any) {
+      toast.error("Unsupported theme file", {
+        description: e?.message ?? "Could not read schema version.",
+      });
+      return;
+    }
+    const migratedPayload = {
+      ...migrated.file,
+      version: migrated.toVersion,
+      theme: migrated.file.theme,
+    };
+
     // Pre-flight: figure out which tokens are present and which are missing
     // so we can surface a precise error before zod's union message.
-    const candidate =
-      parsed && typeof parsed === "object" && "theme" in (parsed as any)
-        ? (parsed as any).theme
-        : parsed;
+    const candidate = migrated.file.theme;
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
       toast.error("Invalid theme file", {
         description: 'Expected an object with a "theme" map of color tokens.',
@@ -156,7 +178,7 @@ export function ThemeEditor() {
       return;
     }
 
-    const result = themeFileSchema.safeParse(parsed);
+    const result = themeFileSchema.safeParse(migratedPayload);
     if (!result.success) {
       const first = result.error.issues[0];
       const path = first.path.join(".") || "root";
@@ -174,8 +196,11 @@ export function ThemeEditor() {
 
     setTheme({ ...DARK_THEME, ...tokens });
     if (name) setShareName(name);
-    toast.success("Theme imported", {
-      description: `${TOKEN_KEYS.length} tokens applied.`,
+    const wasMigrated = migrated.fromVersion < migrated.toVersion;
+    toast.success(wasMigrated ? "Theme imported & migrated" : "Theme imported", {
+      description: wasMigrated
+        ? `Upgraded v${migrated.fromVersion} → v${migrated.toVersion}. ${TOKEN_KEYS.length} tokens applied.`
+        : `Schema v${THEME_SCHEMA_VERSION}. ${TOKEN_KEYS.length} tokens applied.`,
     });
   };
 
