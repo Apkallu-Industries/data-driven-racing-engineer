@@ -14,6 +14,7 @@ import {
   type TrackCarFingerprint,
 } from "@/lib/fingerprint/compute";
 import { formatLapTime } from "@/lib/lapfile/parser";
+import { classifyCar, type CarClass } from "@/lib/fingerprint/carClass";
 
 export const Route = createFileRoute("/fingerprint")({
   head: () => ({
@@ -42,6 +43,78 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 font-mono text-2xl tabular-nums">{value}</div>
       {sub && <div className="font-mono text-[10px] text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+function scoreColor(score: number) {
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 65) return "text-lime-400";
+  if (score >= 50) return "text-amber-400";
+  if (score >= 35) return "text-orange-400";
+  return "text-rose-400";
+}
+
+function ClassScoreCard({
+  c,
+}: {
+  c: {
+    cls: string;
+    pairs: number;
+    tracks: number;
+    cars: number;
+    totalFiles: number;
+    improvement: number | null;
+    sigma: number | null;
+    score: number;
+    bestPair: TrackCarFingerprint;
+  };
+}) {
+  return (
+    <div className="hairline rounded-md bg-rail/30 p-3">
+      <div className="flex items-baseline justify-between">
+        <div className="font-mono text-[12px] uppercase tracking-wider text-foreground">{c.cls}</div>
+        <div className={`font-mono text-2xl tabular-nums ${scoreColor(c.score)}`}>{c.score.toFixed(0)}</div>
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-sm bg-rail">
+        <div
+          className="h-full bg-primary transition-[width]"
+          style={{ width: `${Math.max(0, Math.min(100, c.score))}%` }}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px] text-muted-foreground">
+        <div>
+          <div className="text-muted-foreground/70">Tracks</div>
+          <div className="text-foreground tabular-nums">{c.tracks}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Cars</div>
+          <div className="text-foreground tabular-nums">{c.cars}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Files</div>
+          <div className="text-foreground tabular-nums">{c.totalFiles}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Peak</div>
+          <div className="text-foreground tabular-nums">
+            {c.improvement != null ? `${(c.improvement * 100).toFixed(1)}%` : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">σ</div>
+          <div className="text-foreground tabular-nums">
+            {c.sigma != null ? `${c.sigma.toFixed(2)}s` : "—"}
+          </div>
+        </div>
+        <div className="col-span-1">
+          <div className="text-muted-foreground/70">Best</div>
+          <div className="text-foreground tabular-nums">{formatLapTime(c.bestPair.bestEverS)}</div>
+        </div>
+      </div>
+      <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+        {c.bestPair.track} · {c.bestPair.car}
+      </div>
     </div>
   );
 }
@@ -120,6 +193,50 @@ function FingerprintPage() {
     () => (fp ? [...fp.pairs].sort((a, b) => a.bestEverS - b.bestEverS) : []),
     [fp],
   );
+
+  const classSummaries = useMemo(() => {
+    if (!fp) return [];
+    const buckets = new Map<CarClass, TrackCarFingerprint[]>();
+    for (const p of fp.pairs) {
+      const c = classifyCar(p.car);
+      if (!buckets.has(c)) buckets.set(c, []);
+      buckets.get(c)!.push(p);
+    }
+    const median = (xs: number[]) => {
+      if (!xs.length) return 0;
+      const s = [...xs].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+    const out = Array.from(buckets.entries()).map(([cls, ps]) => {
+      const multi = ps.filter((p) => p.fileCount >= 2 && p.medianBestS > 0);
+      const improvement = multi.length
+        ? median(multi.map((p) => p.bestEverS / p.medianBestS))
+        : null; // 0..1, closer to 1 = closer to peak
+      const sigma = multi.length ? median(multi.map((p) => p.bestStdevS)) : null;
+      const tracks = new Set(ps.map((p) => p.track)).size;
+      const cars = new Set(ps.map((p) => p.car)).size;
+      const totalFiles = ps.reduce((a, b) => a + b.fileCount, 0);
+      // Composite 0..100 score
+      const impScore = improvement != null ? improvement * 100 : 50; // unknown → neutral
+      const conScore = sigma != null ? Math.max(0, 100 - sigma * 100) : 50;
+      const varScore = Math.min(100, tracks * 10 + cars * 5);
+      const score = +(0.5 * impScore + 0.35 * conScore + 0.15 * varScore).toFixed(1);
+      const bestPair = [...ps].sort((a, b) => a.bestEverS - b.bestEverS)[0];
+      return {
+        cls,
+        pairs: ps.length,
+        tracks,
+        cars,
+        totalFiles,
+        improvement,
+        sigma,
+        score,
+        bestPair,
+      };
+    });
+    return out.sort((a, b) => b.score - a.score);
+  }, [fp]);
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -262,6 +379,23 @@ function FingerprintPage() {
                 )}
               </div>
             </div>
+
+            {classSummaries.length > 0 && (
+              <div className="hairline rounded-md bg-panel">
+                <div className="hairline-b flex items-center justify-between px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span>Baseline score by car class</span>
+                  <span>{classSummaries.length} classes</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {classSummaries.map((c) => (
+                    <ClassScoreCard key={c.cls} c={c} />
+                  ))}
+                </div>
+                <div className="hairline-t px-3 py-2 font-mono text-[10px] text-muted-foreground">
+                  Score = 50 % closeness-to-peak (best ÷ typical) · 35 % consistency (lower σ) · 15 % variety (tracks + cars).
+                </div>
+              </div>
+            )}
 
             <div className="hairline rounded-md bg-panel">
               <div className="hairline-b flex items-center justify-between px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
