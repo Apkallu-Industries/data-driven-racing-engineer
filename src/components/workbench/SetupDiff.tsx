@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitCompare, Loader2, Flame } from "lucide-react";
+import { GitCompare, Loader2, Flame, ChevronDown, ChevronRight } from "lucide-react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { parseCarSetup, diffSetups, type SetupDiff as SetupDiffRow } from "@/lib/ibt/setup";
 import { fetchPbSetup } from "@/server/setup.functions";
@@ -116,6 +116,18 @@ export function SetupDiff({
     return [...m.entries()].sort(([a], [b]) => groupRank(a) - groupRank(b));
   }, [diffs]);
 
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleGroup = (g: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+  const allCollapsed = grouped.length > 0 && grouped.every(([g]) => collapsed.has(g));
+  const toggleAll = () =>
+    setCollapsed(allCollapsed ? new Set() : new Set(grouped.map(([g]) => g)));
+
   if (!current) {
     return (
       <div className="flex h-full items-center justify-center px-4 text-center font-mono text-[11px] text-muted-foreground">
@@ -154,6 +166,14 @@ export function SetupDiff({
           vs PB · {pb.name}
           {pb.bestLapS != null ? ` · ${pb.bestLapS.toFixed(3)}s` : ""} · {diffs.length} changes
         </span>
+        {diffs.length > 0 && (
+          <button
+            onClick={toggleAll}
+            className="ml-auto rounded-sm border border-border bg-rail px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            {allCollapsed ? "Expand all" : "Collapse all"}
+          </button>
+        )}
       </div>
       {diffs.length === 0 ? (
         <div className="flex flex-1 items-center justify-center font-mono text-[11px] text-muted-foreground">
@@ -173,15 +193,25 @@ export function SetupDiff({
             {grouped.map(([group, rows]) => (
               <tbody key={group}>
                 <tr className="bg-rail/60">
-                  <td
-                    colSpan={4}
-                    className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground"
-                  >
-                    {group}
-                    <span className="ml-2 text-muted-foreground/60">{rows.length}</span>
+                  <td colSpan={4} className="p-0">
+                    <button
+                      onClick={() => toggleGroup(group)}
+                      className="flex w-full items-center gap-1 px-3 py-1 text-left text-[10px] uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      {collapsed.has(group) ? (
+                        <ChevronRight className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                      {group}
+                      <span className="ml-2 text-muted-foreground/60">{rows.length}</span>
+                      {rows.some((d) => topPaths.has(d.path)) && (
+                        <Flame className="ml-1 h-3 w-3 text-primary" />
+                      )}
+                    </button>
                   </td>
                 </tr>
-                {rows.map((d) => {
+                {!collapsed.has(group) && rows.map((d) => {
                   const delta = fmtDelta(d);
                   const isTop = topPaths.has(d.path);
                   // Strip group prefix for compact display.
