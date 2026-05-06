@@ -67,6 +67,8 @@ function ClassScoreCard({
     totalFiles: number;
     improvement: number | null;
     sigma: number | null;
+    wrPct: number | null;
+    targetsSet: number;
     score: number;
     bestPair: TrackCarFingerprint;
   };
@@ -112,6 +114,19 @@ function ClassScoreCard({
           <div className="text-muted-foreground/70">Best</div>
           <div className="text-foreground tabular-nums">{formatLapTime(c.bestPair.bestEverS)}</div>
         </div>
+      </div>
+      <div className="mt-2 flex items-baseline justify-between font-mono text-[10px]">
+        <span className="text-muted-foreground/70">vs Target</span>
+        <span className="tabular-nums">
+          {c.wrPct != null ? (
+            <span className={c.wrPct >= 99 ? "text-emerald-400" : c.wrPct >= 97 ? "text-lime-400" : c.wrPct >= 94 ? "text-amber-400" : "text-rose-400"}>
+              {c.wrPct.toFixed(1)}%
+              <span className="ml-1 text-muted-foreground">({c.targetsSet} set)</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">no targets</span>
+          )}
+        </span>
       </div>
       <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
         {c.bestPair.track} · {c.bestPair.car}
