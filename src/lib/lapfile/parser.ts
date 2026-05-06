@@ -246,11 +246,30 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
   const channels: LapfileChannel[] = [];
   if (numBins <= 0 || numChannels <= 0) return channels;
   const channelByteLen = numBins * 4;
-  // Scan ALL remaining body bytes as numBins-float windows (not just numChannels).
-  // The exact channel count per file is still being reverse-engineered, so we
-  // expose every detected window for visual identification in the debug view.
-  const maxChannels = Math.floor((raw.byteLength - bodyOffset) / channelByteLen);
-  const totalChannels = Math.max(numChannels, maxChannels);
+  // CONFIRMED across 9 Talladega files (1068 bins, 14 channels):
+  //   ch00              = distance ramp (m)              — span 2× track length
+  //   ch01..ch06        = best-lap cumulative-time bands at 6 sub-segment scales
+  //   ch07              = steering angle (radians, ±π)
+  //   ch08..ch13        = optimal-lap cumulative-time bands (mirror of 01..06)
+  // Trailer = remaining bytes after channels (≈ 80B sector/lap-times block).
+  const totalChannels = Math.floor((raw.byteLength - bodyOffset) / channelByteLen);
+  const PAIRED_LABELS = [
+    "distance",        // 0
+    "best.t.seg1",     // 1
+    "best.t.seg2",     // 2
+    "best.t.seg3",     // 3
+    "best.t.seg4",     // 4
+    "best.t.seg5",     // 5
+    "best.t.seg6",     // 6
+    "steering",        // 7
+    "opt.t.seg1",      // 8
+    "opt.t.seg2",      // 9
+    "opt.t.seg3",      // 10
+    "opt.t.seg4",      // 11
+    "opt.t.seg5",      // 12
+    "opt.t.seg6",      // 13
+  ];
+  const PAIRED_UNITS = ["m","s","s","s","s","s","s","rad","s","s","s","s","s","s"];
   for (let c = 0; c < totalChannels; c++) {
     const off = bodyOffset + c * channelByteLen;
     if (off + channelByteLen > raw.byteLength) break;
@@ -267,12 +286,13 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
     for (let i = 0; i < numBins; i++) {
       if (!Number.isFinite(values[i]) || Math.abs(values[i]) > 1e30) values[i] = NaN;
     }
-    const guess = guessChannel(values);
     const s = statsOf(values);
     if (s.min === 0 && s.max === 0) continue;
+    const label = c < PAIRED_LABELS.length ? PAIRED_LABELS[c] : guessChannel(values).label + `#${c + 1}`;
+    const unit = c < PAIRED_UNITS.length ? PAIRED_UNITS[c] : guessChannel(values).unit;
     channels.push({
-      label: `${guess.label}#${c + 1}`,
-      unit: guess.unit,
+      label,
+      unit,
       values,
       min: s.min,
       max: s.max,
