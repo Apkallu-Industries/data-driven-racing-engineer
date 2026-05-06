@@ -40,14 +40,12 @@ export interface DriverFingerprint {
   pairs: TrackCarFingerprint[];
   /** Global indices. */
   indices: {
-    /** Median (best/optimal) ratio across pairs — 1.0 = perfect lap-stitching. */
-    paceIndex: number | null;
-    /** Median gap to optimal (s) across pairs. */
+    /** Median (bestEver / medianBest) across pairs with ≥2 files — 1.0 = always at peak. */
+    selfImprovementIndex: number | null;
+    /** Median best-lap stdev (s) across pairs with ≥2 files — pace consistency. */
     consistencyIndexS: number | null;
     /** Number of distinct tracks. */
     versatility: number;
-    /** Median sector balance bias (which sector tends to lose time). */
-    sectorBias: { sector: number; relPct: number } | null;
     /** Net trajectory: % of pairs improving − % regressing. */
     trajectoryScore: number | null;
   };
@@ -219,39 +217,11 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
 
   pairs.sort((a, b) => a.track.localeCompare(b.track) || a.car.localeCompare(b.car));
 
-  // Global indices.
-  const ratios = pairs
-    .filter((p) => p.optimalEverS != null && isValidLap(p.bestEverS))
-    .map((p) => p.optimalEverS! / p.bestEverS);
-  const gaps = pairs
-    .filter((p) => p.optimalEverS != null && isValidLap(p.bestEverS))
-    .map((p) => +(p.bestEverS - p.optimalEverS!).toFixed(3));
+  // Global indices — only use metrics we can compute reliably from best-lap data.
   const tracks = new Set(pairs.map((p) => p.track));
-  // Sector bias: average each sector's relative balance across pairs (only those with same number of sectors as the modal count).
-  let sectorBias: { sector: number; relPct: number } | null = null;
-  const sectorCounts = pairs.map((p) => p.sectorBalancePct.length);
-  if (sectorCounts.length) {
-    const mode = sectorCounts.sort((a, b) => sectorCounts.filter((v) => v === a).length - sectorCounts.filter((v) => v === b).length).pop()!;
-    if (mode > 0) {
-      const cols = Array.from({ length: mode }, () => [] as number[]);
-      for (const p of pairs) {
-        if (p.sectorBalancePct.length === mode) p.sectorBalancePct.forEach((v, i) => cols[i].push(v));
-      }
-      const means = cols.map((c) => (c.length ? c.reduce((a, b) => a + b, 0) / c.length : 0));
-      // Expected uniform balance is 100/mode per sector.
-      const expected = 100 / mode;
-      let worst = 0;
-      let worstRel = 0;
-      means.forEach((m, i) => {
-        const rel = m - expected;
-        if (Math.abs(rel) > Math.abs(worstRel)) {
-          worst = i;
-          worstRel = rel;
-        }
-      });
-      sectorBias = { sector: worst + 1, relPct: +worstRel.toFixed(2) };
-    }
-  }
+  const multiFile = pairs.filter((p) => p.fileCount >= 2 && p.medianBestS > 0);
+  const selfImpRatios = multiFile.map((p) => p.bestEverS / p.medianBestS);
+  const stdevs = multiFile.map((p) => p.bestStdevS);
 
   const trends = pairs.map((p) => p.trend).filter(Boolean) as string[];
   const trajectoryScore = trends.length
@@ -265,10 +235,9 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
     totalCars: new Set(pairs.map((p) => p.car)).size,
     pairs,
     indices: {
-      paceIndex: ratios.length ? +median(ratios).toFixed(4) : null,
-      consistencyIndexS: gaps.length ? +median(gaps).toFixed(3) : null,
+      selfImprovementIndex: selfImpRatios.length ? +median(selfImpRatios).toFixed(4) : null,
+      consistencyIndexS: stdevs.length ? +median(stdevs).toFixed(3) : null,
       versatility: tracks.size,
-      sectorBias,
       trajectoryScore,
     },
     emptyTracks: [],

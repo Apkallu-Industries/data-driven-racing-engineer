@@ -223,9 +223,9 @@ function FingerprintPage() {
                 sub={`${fp.pairs.length} track·car pairs`}
               />
               <StatTile
-                label="Pace index"
-                value={fp.indices.paceIndex != null ? fp.indices.paceIndex.toFixed(4) : "—"}
-                sub="optimal ÷ best (1 = perfect stitching)"
+                label="Self-improvement"
+                value={fp.indices.selfImprovementIndex != null ? fp.indices.selfImprovementIndex.toFixed(4) : "—"}
+                sub="best ÷ typical (1 = always at peak)"
               />
               <StatTile
                 label="Consistency"
@@ -234,28 +234,11 @@ function FingerprintPage() {
                     ? `${fp.indices.consistencyIndexS.toFixed(3)} s`
                     : "—"
                 }
-                sub="median gap to optimal"
+                sub="median best-lap σ across pairs"
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="hairline rounded-md bg-panel p-3">
-                <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Sector tendency
-                </div>
-                {fp.indices.sectorBias ? (
-                  <div className="mt-1 font-mono text-sm">
-                    You {fp.indices.sectorBias.relPct > 0 ? "spend more time" : "are quickest"} in{" "}
-                    <span className="text-foreground">S{fp.indices.sectorBias.sector}</span>{" "}
-                    <span className="text-muted-foreground">
-                      ({fp.indices.sectorBias.relPct > 0 ? "+" : ""}
-                      {fp.indices.sectorBias.relPct}% vs uniform)
-                    </span>
-                  </div>
-                ) : (
-                  <div className="mt-1 text-[12px] text-muted-foreground">Not enough data.</div>
-                )}
-              </div>
+            <div className="grid grid-cols-1 gap-3">
               <div className="hairline rounded-md bg-panel p-3">
                 <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                   Trajectory
@@ -292,35 +275,29 @@ function FingerprintPage() {
                       <th className="px-2 py-1.5 text-left">Track</th>
                       <th className="px-2 py-1.5 text-left">Car</th>
                       <th className="px-2 py-1.5 text-right">Files</th>
+                      <th className="px-2 py-1.5 text-right">Length</th>
                       <th className="px-2 py-1.5 text-right">Best</th>
-                      <th className="px-2 py-1.5 text-right">Optimal</th>
-                      <th className="px-2 py-1.5 text-right">Gap</th>
+                      <th className="px-2 py-1.5 text-right">Median</th>
                       <th className="px-2 py-1.5 text-right">σ</th>
-                      <th className="px-2 py-1.5 text-left">Sectors (best)</th>
                       <th className="px-2 py-1.5 text-center">Trend</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPairs.map((p, i) => {
-                      const gap =
-                        p.optimalEverS != null ? +(p.bestEverS - p.optimalEverS).toFixed(3) : null;
                       return (
                         <tr key={i} className="hairline-b hover:bg-accent/30">
                           <td className="px-2 py-1 text-left">{p.track}</td>
                           <td className="px-2 py-1 text-left text-muted-foreground">{p.car}</td>
                           <td className="px-2 py-1 text-right tabular-nums">{p.fileCount}</td>
+                          <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
+                            {p.trackLengthM > 0 ? `${(p.trackLengthM / 1000).toFixed(2)} km` : "—"}
+                          </td>
                           <td className="px-2 py-1 text-right tabular-nums">{formatLapTime(p.bestEverS)}</td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                            {p.optimalEverS != null ? formatLapTime(p.optimalEverS) : "—"}
-                          </td>
-                          <td className="px-2 py-1 text-right tabular-nums">
-                            {gap != null ? gap.toFixed(3) : "—"}
+                            {formatLapTime(p.medianBestS)}
                           </td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
                             {p.bestStdevS.toFixed(3)}
-                          </td>
-                          <td className="px-2 py-1 text-left tabular-nums text-muted-foreground">
-                            {p.bestLapSectors.map((s) => s.toFixed(3)).join(" · ") || "—"}
                           </td>
                           <td className="px-2 py-1 text-center">{trendIcon(p.trend)}</td>
                         </tr>
