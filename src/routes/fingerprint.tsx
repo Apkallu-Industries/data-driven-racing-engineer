@@ -471,7 +471,14 @@ function FingerprintPage() {
                           <td className="px-2 py-1 text-left text-muted-foreground">{p.car}</td>
                           <td className="px-2 py-1 text-right tabular-nums">{p.fileCount}</td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                            {p.trackLengthM > 0 ? `${(p.trackLengthM / 1000).toFixed(2)} km` : "—"}
+                            {p.trackLengthM > 0 ? (
+                              <span title={p.trackLengthKnown ? "Verified iRacing length" : "Approx — parsed from lapfile"}>
+                                {(p.trackLengthM / 1000).toFixed(2)} km
+                                {!p.trackLengthKnown && <span className="ml-0.5 text-amber-400">~</span>}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td className="px-2 py-1 text-right tabular-nums">{formatLapTime(p.bestEverS)}</td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">

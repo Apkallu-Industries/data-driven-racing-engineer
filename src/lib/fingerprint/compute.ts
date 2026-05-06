@@ -1,4 +1,5 @@
 import { parseLapfile, type ParsedLapfile } from "@/lib/lapfile/parser";
+import { knownTrackLength } from "@/lib/fingerprint/trackLengths";
 
 /** Aggregate metrics for one (track, car) pair across all lapfiles found. */
 export interface TrackCarFingerprint {
@@ -21,6 +22,8 @@ export interface TrackCarFingerprint {
   sectorBalancePct: number[];
   /** Track length in meters. */
   trackLengthM: number;
+  /** True when length came from the known-tracks lookup, false = parsed (approx). */
+  trackLengthKnown: boolean;
   /** Most recent build date string we saw, if any. */
   latestBuildDate: string | null;
   /** Earliest build date string we saw, if any. */
@@ -123,12 +126,12 @@ export function parseRaw(raw: RawLapfile): ParsedLapfile {
 /** Compute aggregates from already-parsed lapfiles. */
 export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLapfile }[]): DriverFingerprint {
   // Group by (track, car). Use header.trackName when available, fallback to folder name.
-  const groups = new Map<string, { track: string; car: string; files: ParsedLapfile[] }>();
+  const groups = new Map<string, { track: string; car: string; folder: string; files: ParsedLapfile[] }>();
   for (const r of parsed) {
     const track = r.parsed.header.trackName || r.trackFolder;
     const car = r.parsed.header.carShortName || "(unknown car)";
     const key = `${track}|${car}`;
-    const g = groups.get(key) ?? { track, car, files: [] };
+    const g = groups.get(key) ?? { track, car, folder: r.trackFolder, files: [] };
     g.files.push(r.parsed);
     groups.set(key, g);
   }
@@ -207,7 +210,15 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
       bestLapSectors: allSectorsValid ? bestSectors.map((s) => +s.toFixed(3)) : [],
       bestPerSector: bestPerSector.map((s) => +s.toFixed(3)),
       sectorBalancePct: sectorBalancePct.map((s) => +s.toFixed(2)),
-      trackLengthM: +bestEverFile.summary.trackLengthM.toFixed(1),
+      ...(() => {
+        const known = knownTrackLength(g.folder, g.track);
+        return known
+          ? { trackLengthM: known.m, trackLengthKnown: true }
+          : {
+              trackLengthM: +bestEverFile.summary.trackLengthM.toFixed(1),
+              trackLengthKnown: false,
+            };
+      })(),
       latestBuildDate: dated.length ? dated[dated.length - 1].d : null,
       earliestBuildDate: dated.length ? dated[0].d : null,
       trend,
