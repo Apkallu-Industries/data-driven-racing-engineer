@@ -219,7 +219,12 @@ function FingerprintPage() {
   }, [fp]);
 
   const sortedPairs = useMemo(
-    () => (fp ? [...fp.pairs].sort((a, b) => a.bestEverS - b.bestEverS) : []),
+    () =>
+      fp
+        ? [...fp.pairs].sort(
+            (a, b) => a.track.localeCompare(b.track) || a.car.localeCompare(b.car),
+          )
+        : [],
     [fp],
   );
 
