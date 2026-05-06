@@ -67,6 +67,20 @@ export interface RawLapfile {
   buffer: ArrayBuffer;
 }
 
+/** Sentinel thresholds — iRacing reference files often contain 0 or sub-second
+ * placeholder times when a sector / lap was never set. Anything below these
+ * floors is treated as missing rather than a real time. */
+const MIN_LAP_S = 5;
+const MIN_SECTOR_S = 1;
+const MAX_LAP_S = 60 * 30; // 30 min lap upper bound
+
+function isValidLap(s: number): boolean {
+  return Number.isFinite(s) && s >= MIN_LAP_S && s <= MAX_LAP_S;
+}
+function isValidSector(s: number): boolean {
+  return Number.isFinite(s) && s >= MIN_SECTOR_S && s <= MAX_LAP_S;
+}
+
 /** Median helper. */
 function median(xs: number[]): number {
   if (xs.length === 0) return NaN;
@@ -123,27 +137,48 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
 
   const pairs: TrackCarFingerprint[] = [];
   for (const g of groups.values()) {
-    const bestLaps = g.files.map((f) => f.summary.bestLapS).filter((s) => Number.isFinite(s) && s > 0);
+    const bestLaps = g.files.map((f) => f.summary.bestLapS).filter(isValidLap);
     if (bestLaps.length === 0) continue;
     const bestEver = Math.min(...bestLaps);
     const bestEverFile = g.files.find((f) => f.summary.bestLapS === bestEver)!;
 
-    // Per-sector best across all files.
-    const numSec = Math.max(0, ...g.files.map((f) => f.summary.sectorTimesS.length));
+    // Per-sector best across all files. Only count sectors from files whose
+    // bestLap itself is valid AND whose sectors all pass the floor — this
+    // prevents a single junk file from poisoning the optimal.
+    const validSectorFiles = g.files.filter(
+      (f) =>
+        isValidLap(f.summary.bestLapS) &&
+        f.summary.sectorTimesS.length > 0 &&
+        f.summary.sectorTimesS.every(isValidSector),
+    );
+    const numSec = Math.max(0, ...validSectorFiles.map((f) => f.summary.sectorTimesS.length));
     const bestPerSector: number[] = [];
+    let sectorsComplete = numSec > 0;
     for (let s = 0; s < numSec; s++) {
-      const vals = g.files
+      const vals = validSectorFiles
         .map((f) => f.summary.sectorTimesS[s])
-        .filter((v) => Number.isFinite(v) && v > 0);
+        .filter(isValidSector);
       if (vals.length) bestPerSector.push(Math.min(...vals));
+      else sectorsComplete = false;
     }
-    const optimalEver = bestPerSector.length === numSec && numSec > 0
+    // Sanity: optimal must be ≤ bestEver and within 50% of it.
+    const optimalSum = bestPerSector.reduce((a, b) => a + b, 0);
+    const optimalEver = sectorsComplete &&
+      optimalSum > 0 &&
+      optimalSum <= bestEver + 0.001 &&
+      optimalSum >= bestEver * 0.5
       ? bestPerSector.reduce((a, b) => a + b, 0)
       : null;
 
-    const sectorBalancePct = bestEverFile.summary.sectorTimesS
-      .filter((s) => Number.isFinite(s) && s > 0)
-      .map((s) => (s / bestEver) * 100);
+    // Sector balance only meaningful if best lap's sectors are all valid AND
+    // sum to ~bestEver (within 5%). Otherwise the balance is misleading.
+    const bestSectors = bestEverFile.summary.sectorTimesS;
+    const allSectorsValid = bestSectors.length > 0 && bestSectors.every(isValidSector);
+    const sectorSum = bestSectors.reduce((a, b) => a + b, 0);
+    const sectorsCloseToLap = allSectorsValid && Math.abs(sectorSum - bestEver) / bestEver < 0.05;
+    const sectorBalancePct = sectorsCloseToLap
+      ? bestSectors.map((s) => (s / bestEver) * 100)
+      : [];
 
     // Build dates → trend.
     const dated = g.files
@@ -151,7 +186,7 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
         d: f.header.buildDates[0] ?? null,
         b: f.summary.bestLapS,
       }))
-      .filter((x) => x.d && Number.isFinite(x.b) && x.b > 0)
+      .filter((x) => x.d && isValidLap(x.b))
       .sort((a, b) => (a.d! < b.d! ? -1 : 1));
     let trend: TrackCarFingerprint["trend"] = null;
     if (dated.length >= 4) {
@@ -166,12 +201,12 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
     pairs.push({
       track: g.track,
       car: g.car,
-      fileCount: g.files.length,
+      fileCount: bestLaps.length,
       bestEverS: +bestEver.toFixed(3),
       optimalEverS: optimalEver != null ? +optimalEver.toFixed(3) : null,
       medianBestS: +median(bestLaps).toFixed(3),
       bestStdevS: +stdev(bestLaps).toFixed(3),
-      bestLapSectors: bestEverFile.summary.sectorTimesS.map((s) => +s.toFixed(3)),
+      bestLapSectors: allSectorsValid ? bestSectors.map((s) => +s.toFixed(3)) : [],
       bestPerSector: bestPerSector.map((s) => +s.toFixed(3)),
       sectorBalancePct: sectorBalancePct.map((s) => +s.toFixed(2)),
       trackLengthM: +bestEverFile.summary.trackLengthM.toFixed(1),
@@ -186,10 +221,10 @@ export function buildFingerprint(parsed: { trackFolder: string; parsed: ParsedLa
 
   // Global indices.
   const ratios = pairs
-    .filter((p) => p.optimalEverS != null && p.bestEverS > 0)
+    .filter((p) => p.optimalEverS != null && isValidLap(p.bestEverS))
     .map((p) => p.optimalEverS! / p.bestEverS);
   const gaps = pairs
-    .filter((p) => p.optimalEverS != null)
+    .filter((p) => p.optimalEverS != null && isValidLap(p.bestEverS))
     .map((p) => +(p.bestEverS - p.optimalEverS!).toFixed(3));
   const tracks = new Set(pairs.map((p) => p.track));
   // Sector bias: average each sector's relative balance across pairs (only those with same number of sectors as the modal count).
