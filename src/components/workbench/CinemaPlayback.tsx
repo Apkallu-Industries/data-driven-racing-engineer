@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
-import { Play, Pause, Rewind, FastForward, SkipBack, SkipForward } from "lucide-react";
+import { Play, Pause, Rewind, FastForward, SkipBack, SkipForward, Settings } from "lucide-react";
+import { useHudPrefs } from "@/lib/hudConfig";
+import { HudSettings } from "./HudSettings";
 
 /**
  * Cinematic telemetry playback HUD.
@@ -11,8 +13,6 @@ import { Play, Pause, Rewind, FastForward, SkipBack, SkipForward } from "lucide-
  * gear, throttle/brake stacked bars, steering wheel that actually rotates,
  * a lat/long G dot, and a track-progress arc with the current lap time.
  */
-
-const MS_TO_KMH = 3.6;
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -35,6 +35,8 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
     setSpeed,
     refLap,
   } = useWorkbench();
+  const [prefs] = useHudPrefs();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const total = parsed.meta.numTicks;
 
@@ -48,22 +50,30 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
 
   // Pull live channel values at cursor.
   const ch = parsed.channels;
-  const v = (n: string) => ch[n]?.data[cursorTick];
+  const v = (slotName: string | undefined) =>
+    slotName && ch[slotName] ? ch[slotName].data[cursorTick] : undefined;
+  const cfg = prefs.config;
 
-  const speedKmh = (v("Speed") ?? 0) * MS_TO_KMH;
-  const rpm = v("RPM") ?? 0;
-  const rpmMax = ch["RPM"]?.max ?? 9000;
-  const gear = Math.round(v("Gear") ?? 0);
-  const throttle = clamp01(v("Throttle") ?? 0);
-  const brake = clamp01(v("Brake") ?? 0);
-  const clutch = clamp01(v("Clutch") ?? 0);
-  const steerRad = v("SteeringWheelAngle") ?? 0;
-  const steerMax = ch["SteeringWheelAngleMax"]?.data[cursorTick] ?? Math.max(Math.PI, ch["SteeringWheelAngle"]?.max ?? Math.PI);
-  const latG = (v("LatAccel") ?? 0) / 9.81;
-  const longG = (v("LongAccel") ?? 0) / 9.81;
-  const lapTime = v("LapCurrentLapTime") ?? 0;
-  const lapPct = clamp01(v("LapDistPct") ?? 0);
-  const fuelL = v("FuelLevel");
+  const speedRaw = v(cfg.speed) ?? 0;
+  const speedFactor =
+    prefs.speedUnit === "kmh" ? 3.6 : prefs.speedUnit === "mph" ? 2.23694 : 1;
+  const speedDisplay = speedRaw * speedFactor;
+  const speedUnitLabel =
+    prefs.speedUnit === "kmh" ? "KM/H" : prefs.speedUnit === "mph" ? "MPH" : "M/S";
+  const rpm = v(cfg.rpm) ?? 0;
+  const rpmMax = ch[cfg.rpm]?.max ?? 9000;
+  const gear = Math.round(v(cfg.gear) ?? 0);
+  const throttle = clamp01(v(cfg.throttle) ?? 0);
+  const brake = clamp01(v(cfg.brake) ?? 0);
+  const clutch = clamp01(v(cfg.clutch) ?? 0);
+  const steerRad = v(cfg.steer) ?? 0;
+  const steerMax =
+    v(cfg.steerMax) ?? Math.max(Math.PI, ch[cfg.steer]?.max ?? Math.PI);
+  const latG = (v(cfg.latG) ?? 0) / 9.81;
+  const longG = (v(cfg.longG) ?? 0) / 9.81;
+  const lapTime = v(cfg.lapTime) ?? 0;
+  const lapPct = clamp01(v(cfg.lapPct) ?? 0);
+  const fuelL = v(cfg.fuel);
   const lapNum = currentLap?.lap ?? 0;
 
   // RPM arc (0–270°, sweeping clockwise from south-west).
@@ -128,7 +138,16 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
     <div className="flex h-full flex-col bg-[radial-gradient(ellipse_at_center,_color-mix(in_oklab,var(--panel)_92%,var(--primary))_0%,var(--panel)_70%)]">
       <div className="hairline-b flex items-center justify-between gap-3 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <span>Cinema · L{lapNum}{refLap === lapNum ? " · ref" : ""}</span>
-        <span className="tabular-nums">{fmtTime(lapTime)}</span>
+        <div className="flex items-center gap-2">
+          <span className="tabular-nums">{fmtTime(lapTime)}</span>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex h-5 items-center gap-1 rounded-sm border border-border px-1.5 text-[10px] hover:text-foreground"
+            title="Customize HUD"
+          >
+            <Settings className="h-3 w-3" /> Layout
+          </button>
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.2fr_1fr_1fr] gap-px overflow-hidden bg-border/40">
@@ -168,10 +187,10 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
               {gear === 0 ? "N" : gear === -1 ? "R" : gear}
             </text>
             <text x={100} y={120} textAnchor="middle" fontSize={36} fontFamily="monospace" fontWeight={700} fill="var(--foreground)" className="tabular-nums">
-              {speedKmh.toFixed(0)}
+              {speedDisplay.toFixed(0)}
             </text>
             <text x={100} y={138} textAnchor="middle" fontSize={10} fontFamily="monospace" fill="var(--muted-foreground)">
-              KM/H
+              {speedUnitLabel}
             </text>
             <text x={100} y={172} textAnchor="middle" fontSize={11} fontFamily="monospace" fill="var(--muted-foreground)" className="tabular-nums">
               {Math.round(rpm)} RPM
@@ -257,6 +276,12 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
           </svg>
         </div>
       </div>
+      {settingsOpen && (
+        <HudSettings parsed={parsed} onClose={() => setSettingsOpen(false)} />
+      )}
+    </div>
+  );
+}
 
       {/* Transport */}
       <div className="hairline-t flex items-center gap-2 bg-panel px-3 py-2">
