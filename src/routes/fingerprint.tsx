@@ -47,6 +47,78 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
+function scoreColor(score: number) {
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 65) return "text-lime-400";
+  if (score >= 50) return "text-amber-400";
+  if (score >= 35) return "text-orange-400";
+  return "text-rose-400";
+}
+
+function ClassScoreCard({
+  c,
+}: {
+  c: {
+    cls: string;
+    pairs: number;
+    tracks: number;
+    cars: number;
+    totalFiles: number;
+    improvement: number | null;
+    sigma: number | null;
+    score: number;
+    bestPair: TrackCarFingerprint;
+  };
+}) {
+  return (
+    <div className="hairline rounded-md bg-rail/30 p-3">
+      <div className="flex items-baseline justify-between">
+        <div className="font-mono text-[12px] uppercase tracking-wider text-foreground">{c.cls}</div>
+        <div className={`font-mono text-2xl tabular-nums ${scoreColor(c.score)}`}>{c.score.toFixed(0)}</div>
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-sm bg-rail">
+        <div
+          className="h-full bg-primary transition-[width]"
+          style={{ width: `${Math.max(0, Math.min(100, c.score))}%` }}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px] text-muted-foreground">
+        <div>
+          <div className="text-muted-foreground/70">Tracks</div>
+          <div className="text-foreground tabular-nums">{c.tracks}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Cars</div>
+          <div className="text-foreground tabular-nums">{c.cars}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Files</div>
+          <div className="text-foreground tabular-nums">{c.totalFiles}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">Peak</div>
+          <div className="text-foreground tabular-nums">
+            {c.improvement != null ? `${(c.improvement * 100).toFixed(1)}%` : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground/70">σ</div>
+          <div className="text-foreground tabular-nums">
+            {c.sigma != null ? `${c.sigma.toFixed(2)}s` : "—"}
+          </div>
+        </div>
+        <div className="col-span-1">
+          <div className="text-muted-foreground/70">Best</div>
+          <div className="text-foreground tabular-nums">{formatLapTime(c.bestPair.bestEverS)}</div>
+        </div>
+      </div>
+      <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+        {c.bestPair.track} · {c.bestPair.car}
+      </div>
+    </div>
+  );
+}
+
 function FingerprintPage() {
   const [fp, setFp] = useState<DriverFingerprint | null>(() => loadFingerprint());
   const [busy, setBusy] = useState(false);
