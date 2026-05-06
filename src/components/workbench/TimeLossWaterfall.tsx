@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
 
@@ -9,9 +9,9 @@ import { useWorkbench } from "@/lib/store";
  * positive) versus the reference lap. The cumulative line is the running
  * total, ending at the full lap-time delta. All numbers are measured.
  */
-const NUM_SEGMENTS = 30;
+const SEGMENT_OPTIONS = [10, 20, 30, 50] as const;
 
-function segmentTimes(parsed: IbtParsed, lapNum: number): number[] | null {
+function segmentTimes(parsed: IbtParsed, lapNum: number, n: number): { times: number[]; ticks: number[] } | null {
   const lap = parsed.laps.find((l) => l.lap === lapNum);
   if (!lap) return null;
   const sessionTime = parsed.channels["SessionTime"]?.data;
@@ -19,8 +19,8 @@ function segmentTimes(parsed: IbtParsed, lapNum: number): number[] | null {
   if (!sessionTime || !pct) return null;
 
   const boundaries: number[] = [lap.startTick];
-  for (let s = 1; s < NUM_SEGMENTS; s++) {
-    const target = s / NUM_SEGMENTS;
+  for (let s = 1; s < n; s++) {
+    const target = s / n;
     let found: number | null = null;
     for (let t = lap.startTick + 1; t <= lap.endTick; t++) {
       const prev = pct[t - 1];
@@ -35,7 +35,7 @@ function segmentTimes(parsed: IbtParsed, lapNum: number): number[] | null {
   boundaries.push(lap.endTick);
 
   const times: number[] = [];
-  for (let s = 0; s < NUM_SEGMENTS; s++) {
+  for (let s = 0; s < n; s++) {
     const a = boundaries[s];
     const b = boundaries[s + 1];
     if (!isFinite(a) || !isFinite(b) || b <= a) {
@@ -44,28 +44,29 @@ function segmentTimes(parsed: IbtParsed, lapNum: number): number[] | null {
       times.push(sessionTime[b] - sessionTime[a]);
     }
   }
-  return times;
+  return { times, ticks: boundaries };
 }
 
 export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
-  const { refLap, cmpLap } = useWorkbench();
+  const { refLap, cmpLap, setCursorTick } = useWorkbench();
+  const [n, setN] = useState<number>(30);
 
   const data = useMemo(() => {
     if (refLap == null || cmpLap == null) return null;
-    const ref = segmentTimes(parsed, refLap);
-    const cmp = segmentTimes(parsed, cmpLap);
+    const ref = segmentTimes(parsed, refLap, n);
+    const cmp = segmentTimes(parsed, cmpLap, n);
     if (!ref || !cmp) return null;
     const deltas: number[] = [];
     let cum = 0;
     const cumulative: number[] = [];
-    for (let i = 0; i < NUM_SEGMENTS; i++) {
-      const d = cmp[i] - ref[i];
+    for (let i = 0; i < n; i++) {
+      const d = cmp.times[i] - ref.times[i];
       deltas.push(d);
       if (isFinite(d)) cum += d;
       cumulative.push(cum);
     }
-    return { deltas, cumulative };
-  }, [parsed, refLap, cmpLap]);
+    return { deltas, cumulative, cmpTicks: cmp.ticks, refTicks: ref.ticks };
+  }, [parsed, refLap, cmpLap, n]);
 
   if (refLap == null || cmpLap == null) {
     return (
@@ -82,10 +83,17 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
     );
   }
 
-  const { deltas, cumulative } = data;
+  const { deltas, cumulative, cmpTicks } = data;
   const peak = Math.max(0.001, ...deltas.map((d) => Math.abs(d)).filter((v) => isFinite(v)));
   const cumPeak = Math.max(0.001, ...cumulative.map((v) => Math.abs(v)));
   const total = cumulative[cumulative.length - 1];
+
+  // Worst-loss + best-gain segments for headline.
+  const finite = deltas
+    .map((d, i) => ({ d, i }))
+    .filter((r) => isFinite(r.d));
+  const worst = finite.length ? finite.reduce((a, b) => (b.d > a.d ? b : a)) : null;
+  const best = finite.length ? finite.reduce((a, b) => (b.d < a.d ? b : a)) : null;
 
   // SVG dims
   const W = 800;
@@ -96,7 +104,7 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
   const PAD_B = 24;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
-  const colW = innerW / NUM_SEGMENTS;
+  const colW = innerW / n;
   const yMid = PAD_T + innerH / 2;
 
   const cumLine = cumulative
@@ -111,21 +119,53 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
     <div className="flex h-full flex-col">
       <div className="hairline-b flex items-center justify-between px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <span>Time loss · cmp L{cmpLap} vs ref L{refLap}</span>
-        <span>
-          Total{" "}
-          <span
-            className={
-              total > 0.01
-                ? "text-fuchsia-400"
-                : total < -0.01
-                  ? "text-emerald-400"
-                  : "text-foreground"
-            }
-          >
-            {total > 0 ? "+" : ""}
-            {total.toFixed(3)}s
+        <div className="flex items-center gap-3">
+          {worst && (
+            <span title={`Worst: seg ${worst.i + 1}`}>
+              Worst{" "}
+              <span className="text-fuchsia-400">
+                {worst.d > 0 ? "+" : ""}
+                {worst.d.toFixed(3)}s
+              </span>
+            </span>
+          )}
+          {best && (
+            <span title={`Best: seg ${best.i + 1}`}>
+              Best{" "}
+              <span className="text-emerald-400">
+                {best.d > 0 ? "+" : ""}
+                {best.d.toFixed(3)}s
+              </span>
+            </span>
+          )}
+          <span>
+            Total{" "}
+            <span
+              className={
+                total > 0.01
+                  ? "text-fuchsia-400"
+                  : total < -0.01
+                    ? "text-emerald-400"
+                    : "text-foreground"
+              }
+            >
+              {total > 0 ? "+" : ""}
+              {total.toFixed(3)}s
+            </span>
           </span>
-        </span>
+          <select
+            value={n}
+            onChange={(e) => setN(parseInt(e.target.value, 10))}
+            className="rounded-sm border border-border bg-rail px-1 py-0.5 text-[10px]"
+            title="Segments"
+          >
+            {SEGMENT_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {o} seg
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-2">
         <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
@@ -156,11 +196,26 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
             const h = (Math.abs(d) / peak) * (innerH / 2);
             const y = d >= 0 ? yMid : yMid - h;
             const fill = d > 0 ? "var(--ch-brake)" : "var(--ch-throttle)";
+            const isWorst = worst?.i === i;
+            const tick = cmpTicks[i];
             return (
-              <g key={i}>
-                <rect x={x} y={y} width={w} height={Math.max(0.5, h)} fill={fill} fillOpacity={0.55}>
+              <g
+                key={i}
+                style={{ cursor: "pointer" }}
+                onClick={() => isFinite(tick) && setCursorTick(tick)}
+              >
+                <rect
+                  x={x}
+                  y={y}
+                  width={w}
+                  height={Math.max(0.5, h)}
+                  fill={fill}
+                  fillOpacity={isWorst ? 0.9 : 0.55}
+                  stroke={isWorst ? fill : "none"}
+                  strokeWidth={isWorst ? 1 : 0}
+                >
                   <title>
-                    {`Seg ${i + 1} (${((i / NUM_SEGMENTS) * 100).toFixed(0)}–${(((i + 1) / NUM_SEGMENTS) * 100).toFixed(0)}%): ${d > 0 ? "+" : ""}${d.toFixed(3)}s`}
+                    {`Seg ${i + 1} (${((i / n) * 100).toFixed(0)}–${(((i + 1) / n) * 100).toFixed(0)}%): ${d > 0 ? "+" : ""}${d.toFixed(3)}s — click to jump cursor`}
                   </title>
                 </rect>
               </g>
@@ -196,6 +251,7 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
             <span className="inline-block h-0.5 w-3" style={{ background: "var(--primary)" }} />
             Cumulative Δ
           </span>
+          <span className="ml-auto">Click a bar to jump the cursor.</span>
         </div>
       </div>
     </div>
