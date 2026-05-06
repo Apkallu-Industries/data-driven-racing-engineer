@@ -25,6 +25,117 @@ export type ThemeTokenKey =
 
 export type ThemeMap = Partial<Record<ThemeTokenKey, string>>;
 
+// Bump when token keys are renamed/removed/added in a breaking way.
+// Add a migrator below for each new version.
+export const THEME_SCHEMA_VERSION = 2;
+export const THEME_SCHEMA_ID = "apextrace.theme";
+
+export interface ThemeFile {
+  $schema: string; // "apextrace.theme/v{N}"
+  version: number;
+  name?: string;
+  description?: string | null;
+  theme: Required<ThemeMap>;
+}
+
+/**
+ * Per-version migrations applied in order. Each takes the prior shape and
+ * returns the next. Keys are the SOURCE version (i.e. migrations[1] turns
+ * v1 into v2).
+ */
+const MIGRATIONS: Record<number, (input: any) => any> = {
+  // v1 → v2: original release. v1 had no `version` field and identical token
+  // keys to v2, so this is a structural pass-through. Future renames go here.
+  1: (input) => {
+    const tokens = (input?.theme ?? input) as Record<string, unknown>;
+    return {
+      ...(typeof input === "object" && input !== null && "theme" in input ? input : {}),
+      theme: tokens,
+      version: 2,
+    };
+  },
+};
+
+export interface MigrationResult {
+  file: { name?: string; description?: string | null; theme: Record<string, unknown> };
+  fromVersion: number;
+  toVersion: number;
+  steps: number[]; // versions migrated through
+}
+
+/**
+ * Detect a theme file's schema version and migrate it forward to the current
+ * version. Returns the migrated payload + which versions were applied so the
+ * UI can tell the user what happened. Throws on totally unrecognizable input.
+ */
+export function migrateThemeFile(raw: unknown): MigrationResult {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Theme file must be a JSON object.");
+  }
+  const obj = raw as Record<string, any>;
+
+  // Detect version: explicit `version`, or parse from `$schema` like
+  // "apextrace.theme/v2", or fall back to v1 (the original unversioned shape).
+  let from: number;
+  if (typeof obj.version === "number" && Number.isFinite(obj.version)) {
+    from = obj.version;
+  } else if (typeof obj.$schema === "string") {
+    const m = obj.$schema.match(/\/v(\d+)\b/);
+    from = m ? Number(m[1]) : 1;
+  } else {
+    from = 1;
+  }
+
+  if (from > THEME_SCHEMA_VERSION) {
+    throw new Error(
+      `Theme uses schema v${from}, but this app only understands up to v${THEME_SCHEMA_VERSION}. Update the app to import it.`,
+    );
+  }
+
+  let cur: any = obj;
+  const steps: number[] = [];
+  for (let v = from; v < THEME_SCHEMA_VERSION; v++) {
+    const fn = MIGRATIONS[v];
+    if (!fn) throw new Error(`Missing migration from v${v} to v${v + 1}.`);
+    cur = fn(cur);
+    steps.push(v + 1);
+  }
+
+  // Normalize: ensure `theme` map exists at the top level.
+  const theme =
+    cur && typeof cur === "object" && cur.theme && typeof cur.theme === "object"
+      ? cur.theme
+      : cur;
+
+  return {
+    file: {
+      name: typeof cur?.name === "string" ? cur.name : undefined,
+      description:
+        typeof cur?.description === "string" || cur?.description === null
+          ? cur.description
+          : undefined,
+      theme,
+    },
+    fromVersion: from,
+    toVersion: THEME_SCHEMA_VERSION,
+    steps,
+  };
+}
+
+export function buildThemeFile(input: {
+  name: string;
+  description?: string | null;
+  theme: Required<ThemeMap>;
+}): ThemeFile {
+  return {
+    $schema: `${THEME_SCHEMA_ID}/v${THEME_SCHEMA_VERSION}`,
+    version: THEME_SCHEMA_VERSION,
+    name: input.name,
+    description: input.description ?? null,
+    theme: input.theme,
+  };
+}
+
 export interface ThemeGroup {
   label: string;
   tokens: { key: ThemeTokenKey; label: string }[];
