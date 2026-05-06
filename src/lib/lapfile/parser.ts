@@ -246,16 +246,30 @@ function readChannels(view: DataView, bodyOffset: number, numBins: number, numCh
   const channels: LapfileChannel[] = [];
   if (numBins <= 0 || numChannels <= 0) return channels;
   const channelByteLen = numBins * 4;
-  for (let c = 0; c < numChannels; c++) {
+  // Scan ALL remaining body bytes as numBins-float windows (not just numChannels).
+  // The exact channel count per file is still being reverse-engineered, so we
+  // expose every detected window for visual identification in the debug view.
+  const maxChannels = Math.floor((raw.byteLength - bodyOffset) / channelByteLen);
+  const totalChannels = Math.max(numChannels, maxChannels);
+  for (let c = 0; c < totalChannels; c++) {
     const off = bodyOffset + c * channelByteLen;
     if (off + channelByteLen > raw.byteLength) break;
     // Copy into a fresh Float32Array (raw buffer may not be 4-byte aligned for direct view).
     const values = new Float32Array(numBins);
+    let finiteCount = 0;
     for (let i = 0; i < numBins; i++) {
       values[i] = view.getFloat32(off + i * 4, true);
+      if (Number.isFinite(values[i]) && Math.abs(values[i]) < 1e30) finiteCount++;
+    }
+    // Skip windows that are mostly noise (extreme values or all-zero).
+    if (finiteCount < numBins * 0.5) continue;
+    // Replace pathological values with NaN so charts don't blow up.
+    for (let i = 0; i < numBins; i++) {
+      if (!Number.isFinite(values[i]) || Math.abs(values[i]) > 1e30) values[i] = NaN;
     }
     const guess = guessChannel(values);
     const s = statsOf(values);
+    if (s.min === 0 && s.max === 0) continue;
     channels.push({
       label: `${guess.label}#${c + 1}`,
       unit: guess.unit,
