@@ -96,6 +96,9 @@ function SessionsPage() {
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader>
         <span className="font-mono uppercase tracking-wider">Sessions</span>
+        <Link to="/lab/lapfile" className="ml-3 text-muted-foreground hover:text-foreground">
+          Lapfile Lab
+        </Link>
       </AppHeader>
 
       <main className="mx-auto max-w-7xl p-6">
