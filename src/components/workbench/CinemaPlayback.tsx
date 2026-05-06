@@ -276,12 +276,6 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
           </svg>
         </div>
       </div>
-      {settingsOpen && (
-        <HudSettings parsed={parsed} onClose={() => setSettingsOpen(false)} />
-      )}
-    </div>
-  );
-}
 
       {/* Transport */}
       <div className="hairline-t flex items-center gap-2 bg-panel px-3 py-2">
