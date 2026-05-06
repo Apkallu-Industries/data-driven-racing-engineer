@@ -341,6 +341,9 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
           {fmtTime(cursorTick / parsed.meta.tickRate)} / {fmtTime((total - 1) / parsed.meta.tickRate)}
         </div>
       </div>
+      {settingsOpen && (
+        <HudSettings parsed={parsed} onClose={() => setSettingsOpen(false)} />
+      )}
     </div>
   );
 }
