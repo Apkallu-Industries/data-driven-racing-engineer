@@ -74,6 +74,7 @@ export type Database = {
           name: string
           num_vars: number | null
           recorded_at: string | null
+          setup_yaml: string | null
           storage_path: string
           tick_rate: number | null
           track: string | null
@@ -91,6 +92,7 @@ export type Database = {
           name: string
           num_vars?: number | null
           recorded_at?: string | null
+          setup_yaml?: string | null
           storage_path: string
           tick_rate?: number | null
           track?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           name?: string
           num_vars?: number | null
           recorded_at?: string | null
+          setup_yaml?: string | null
           storage_path?: string
           tick_rate?: number | null
           track?: string | null
