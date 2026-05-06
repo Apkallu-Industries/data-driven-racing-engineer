@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette, RotateCcw, Upload, Download, Share2, Loader2 } from "lucide-react";
+import { z } from "zod";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +24,32 @@ import {
   deleteSharedTheme,
 } from "@/server/themes.functions";
 import { toast } from "sonner";
+
+const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const TOKEN_KEYS = Object.keys(DARK_THEME) as ThemeTokenKey[];
+
+const themeTokensSchema = z.object(
+  Object.fromEntries(
+    TOKEN_KEYS.map((k) => [
+      k,
+      z
+        .string({ message: `"${k}" must be a string` })
+        .regex(HEX_RE, `"${k}" must be a hex color like #rrggbb`),
+    ]),
+  ) as Record<ThemeTokenKey, z.ZodString>,
+).strict();
+
+const themeFileSchema = z.union([
+  z
+    .object({
+      $schema: z.string().optional(),
+      name: z.string().max(60).optional(),
+      description: z.string().max(280).nullable().optional(),
+      theme: themeTokensSchema,
+    })
+    .passthrough(),
+  themeTokensSchema,
+]);
 
 export function ThemeEditor() {
   const { theme, setToken, setTheme, reset } = useTheme();
@@ -80,23 +107,76 @@ export function ThemeEditor() {
   };
 
   const importTheme = async (file: File) => {
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      const incoming = (parsed?.theme ?? parsed) as Record<string, unknown>;
-      if (!incoming || typeof incoming !== "object") throw new Error("Invalid theme");
-      const cleaned: ThemeMap = {};
-      for (const k of Object.keys(DARK_THEME)) {
-        const v = (incoming as Record<string, unknown>)[k];
-        if (typeof v === "string") (cleaned as Record<string, string>)[k] = v;
-      }
-      if (Object.keys(cleaned).length === 0) throw new Error("No matching tokens");
-      setTheme({ ...DARK_THEME, ...cleaned });
-      if (typeof parsed?.name === "string") setShareName(parsed.name);
-      toast.success("Theme imported");
-    } catch (e) {
-      toast.error("Could not import theme");
+    if (file.size > 64 * 1024) {
+      toast.error("Theme file too large", { description: "Max 64 KB." });
+      return;
     }
+    let raw: string;
+    try {
+      raw = await file.text();
+    } catch {
+      toast.error("Could not read file");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e: any) {
+      toast.error("Invalid JSON", {
+        description: e?.message ?? "File is not valid JSON.",
+      });
+      return;
+    }
+
+    // Pre-flight: figure out which tokens are present and which are missing
+    // so we can surface a precise error before zod's union message.
+    const candidate =
+      parsed && typeof parsed === "object" && "theme" in (parsed as any)
+        ? (parsed as any).theme
+        : parsed;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      toast.error("Invalid theme file", {
+        description: 'Expected an object with a "theme" map of color tokens.',
+      });
+      return;
+    }
+    const present = new Set(Object.keys(candidate));
+    const missing = TOKEN_KEYS.filter((k) => !present.has(k));
+    const unknown = [...present].filter((k) => !TOKEN_KEYS.includes(k as ThemeTokenKey));
+    if (missing.length) {
+      toast.error(`Missing ${missing.length} token${missing.length === 1 ? "" : "s"}`, {
+        description: `Required: ${missing.slice(0, 6).join(", ")}${missing.length > 6 ? "…" : ""}`,
+      });
+      return;
+    }
+    if (unknown.length) {
+      toast.error(`Unknown token${unknown.length === 1 ? "" : "s"}`, {
+        description: `Remove: ${unknown.slice(0, 6).join(", ")}${unknown.length > 6 ? "…" : ""}`,
+      });
+      return;
+    }
+
+    const result = themeFileSchema.safeParse(parsed);
+    if (!result.success) {
+      const first = result.error.issues[0];
+      const path = first.path.join(".") || "root";
+      toast.error("Theme validation failed", {
+        description: `${path}: ${first.message}`,
+      });
+      return;
+    }
+
+    const data = result.data as
+      | { theme: Required<ThemeMap>; name?: string }
+      | Required<ThemeMap>;
+    const tokens = "theme" in data ? data.theme : (data as Required<ThemeMap>);
+    const name = "theme" in data ? data.name : undefined;
+
+    setTheme({ ...DARK_THEME, ...tokens });
+    if (name) setShareName(name);
+    toast.success("Theme imported", {
+      description: `${TOKEN_KEYS.length} tokens applied.`,
+    });
   };
 
   const handlePublish = async () => {
