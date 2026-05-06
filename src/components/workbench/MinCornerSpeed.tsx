@@ -89,8 +89,6 @@ function sampleSpeedAtPct(parsed: IbtParsed, lapNum: number, target: number): nu
   return isFinite(vmin) ? vmin : null;
 }
 
-const MS_TO_KMH = 3.6;
-
 export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
   const { refLap, cmpLap, setCursorTick } = useWorkbench();
   const [units, setUnits] = useState<"kmh" | "mph">("kmh");
