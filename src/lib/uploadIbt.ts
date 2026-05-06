@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseIbtInWorker } from "./ibt/parseInWorker";
+import { extractCarSetupYaml } from "./ibt/setup";
 
 export interface UploadResult {
   sessionId: string;
@@ -26,6 +27,9 @@ export async function uploadAndIndexIbt(
   if (upErr) throw upErr;
 
   onProgress?.("save", 98, "Saving metadata");
+  const setupYaml = parsed.meta.sessionInfoYaml
+    ? extractCarSetupYaml(parsed.meta.sessionInfoYaml)
+    : null;
   const { data, error } = await supabase
     .from("telemetry_sessions")
     .insert({
@@ -42,6 +46,7 @@ export async function uploadAndIndexIbt(
       best_lap_s: parsed.meta.bestLapS ?? null,
       storage_path: path,
       recorded_at: new Date(file.lastModified).toISOString(),
+      setup_yaml: setupYaml,
     })
     .select("id")
     .single();
