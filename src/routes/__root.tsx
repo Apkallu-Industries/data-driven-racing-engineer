@@ -4,6 +4,7 @@ import appCss from "../styles.css?url";
 import upCss from "uplot/dist/uPlot.min.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/lib/themeContext";
 
 function NotFoundComponent() {
   return (
@@ -105,8 +106,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <AuthProvider>
-      <Outlet />
-      <Toaster />
+      <ThemeProvider>
+        <Outlet />
+        <Toaster />
+      </ThemeProvider>
     </AuthProvider>
   );
 }
