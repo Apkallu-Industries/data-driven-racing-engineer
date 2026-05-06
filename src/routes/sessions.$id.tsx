@@ -23,6 +23,8 @@ import { SectorSpider } from "@/components/workbench/SectorSpider";
 import { SetupSheet } from "@/components/workbench/SetupSheet";
 import { SetupDiff } from "@/components/workbench/SetupDiff";
 import { ShareButton } from "@/components/workbench/ShareButton";
+import { MinCornerSpeed } from "@/components/workbench/MinCornerSpeed";
+import { TimeLossWaterfall } from "@/components/workbench/TimeLossWaterfall";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -45,7 +47,7 @@ function WorkbenchPage() {
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<
-    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider" | "setup" | "setupdiff"
+    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider" | "setup" | "setupdiff" | "apex" | "waterfall"
   >("readout");
 
   useEffect(() => {
@@ -165,7 +167,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps", "gg", "optimal", "whatif", "brake", "slip", "replay3d", "piano", "spider", "setup", "setupdiff"] as const).map((t) => (
+                    {(["readout", "laps", "gg", "optimal", "whatif", "apex", "waterfall", "brake", "slip", "replay3d", "piano", "spider", "setup", "setupdiff"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -185,7 +187,11 @@ function WorkbenchPage() {
                                 ? "Optimal"
                                 : t === "whatif"
                                   ? "What-if"
-                                  : t === "brake"
+                                  : t === "apex"
+                                    ? "Apex"
+                                    : t === "waterfall"
+                                      ? "Waterfall"
+                                      : t === "brake"
                                     ? "Brake"
                                     : t === "slip"
                                       ? "Slip"
@@ -207,6 +213,8 @@ function WorkbenchPage() {
                     {bottomTab === "gg" && <GGDiagram parsed={parsed} />}
                     {bottomTab === "optimal" && <OptimalLap parsed={parsed} />}
                     {bottomTab === "whatif" && <Counterfactuals parsed={parsed} />}
+                    {bottomTab === "apex" && <MinCornerSpeed parsed={parsed} />}
+                    {bottomTab === "waterfall" && <TimeLossWaterfall parsed={parsed} />}
                     {bottomTab === "brake" && <BrakeBias parsed={parsed} />}
                     {bottomTab === "slip" && <SlipAngle parsed={parsed} />}
                     {bottomTab === "replay3d" && <ReplayThree parsed={parsed} />}
