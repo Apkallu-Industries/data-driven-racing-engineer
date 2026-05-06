@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as SessionsIdRouteImport } from './routes/sessions.$id'
+import { Route as LabLapfileRouteImport } from './routes/lab.lapfile'
 import { Route as ApiPublicOgShareTokenRouteImport } from './routes/api/public/og/share.$token'
 
 const HowItWorksRoute = HowItWorksRouteImport.update({
@@ -47,6 +48,11 @@ const SessionsIdRoute = SessionsIdRouteImport.update({
   path: '/sessions/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabLapfileRoute = LabLapfileRouteImport.update({
+  id: '/lab/lapfile',
+  path: '/lab/lapfile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicOgShareTokenRoute = ApiPublicOgShareTokenRouteImport.update({
   id: '/api/public/og/share/$token',
   path: '/api/public/og/share/$token',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions': typeof SessionsIndexRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/how-it-works'
+    | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/how-it-works'
+    | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/how-it-works'
+    | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   HowItWorksRoute: typeof HowItWorksRoute
+  LabLapfileRoute: typeof LabLapfileRoute
   SessionsIdRoute: typeof SessionsIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab/lapfile': {
+      id: '/lab/lapfile'
+      path: '/lab/lapfile'
+      fullPath: '/lab/lapfile'
+      preLoaderRoute: typeof LabLapfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/og/share/$token': {
       id: '/api/public/og/share/$token'
       path: '/api/public/og/share/$token'
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   HowItWorksRoute: HowItWorksRoute,
+  LabLapfileRoute: LabLapfileRoute,
   SessionsIdRoute: SessionsIdRoute,
   ShareTokenRoute: ShareTokenRoute,
   SessionsIndexRoute: SessionsIndexRoute,
