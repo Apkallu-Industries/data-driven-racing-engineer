@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseServer } from "@/integrations/supabase/client.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const listSharedThemes = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await supabaseServer
+  const { data, error } = await supabaseAdmin
     .from("shared_themes")
     .select("id, user_id, name, description, theme, created_at")
     .order("created_at", { ascending: false })
