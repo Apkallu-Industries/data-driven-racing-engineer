@@ -15,7 +15,7 @@ import {
   type ThemeMap,
 } from "./theme";
 import { useAuth } from "./auth";
-import { getMyTheme, saveMyTheme } from "@/server/preferences.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ThemeCtx {
   theme: ThemeMap;
@@ -50,14 +50,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     if (hydratedFor.current === user.id) return;
     hydratedFor.current = user.id;
-    getMyTheme()
-      .then((res) => {
-        if (res.theme) {
-          setThemeState(res.theme as ThemeMap);
-          saveLocalTheme(res.theme as ThemeMap);
+    supabase
+      .from("user_preferences")
+      .select("theme")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.theme) {
+          setThemeState(data.theme as ThemeMap);
+          saveLocalTheme(data.theme as ThemeMap);
         }
-      })
-      .catch(() => {});
+      });
   }, [user]);
 
   const persist = useCallback(
@@ -66,7 +69,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (!user) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        saveMyTheme({ data: { theme: next as Record<string, string> } }).catch(() => {});
+        supabase
+          .from("user_preferences")
+          .upsert(
+            {
+              user_id: user.id,
+              theme: next as Record<string, string>,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" },
+          )
+          .then(() => {});
       }, 500);
     },
     [user],
@@ -95,7 +108,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(DARK_THEME);
     saveLocalTheme(null);
     if (user) {
-      saveMyTheme({ data: { theme: null } }).catch(() => {});
+      supabase
+        .from("user_preferences")
+        .upsert(
+          { user_id: user.id, theme: null, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" },
+        )
+        .then(() => {});
     }
   }, [user]);
 
