@@ -104,7 +104,7 @@ export function TimeLossWaterfall({ parsed }: { parsed: IbtParsed }) {
   const PAD_B = 24;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
-  const colW = innerW / NUM_SEGMENTS;
+  const colW = innerW / n;
   const yMid = PAD_T + innerH / 2;
 
   const cumLine = cumulative
