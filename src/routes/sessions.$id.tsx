@@ -25,6 +25,7 @@ import { SetupDiff } from "@/components/workbench/SetupDiff";
 import { ShareButton } from "@/components/workbench/ShareButton";
 import { MinCornerSpeed } from "@/components/workbench/MinCornerSpeed";
 import { TimeLossWaterfall } from "@/components/workbench/TimeLossWaterfall";
+import { CinemaPlayback } from "@/components/workbench/CinemaPlayback";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -47,8 +48,8 @@ function WorkbenchPage() {
   const [progress, setProgress] = useState<{ phase: string; pct: number; msg?: string } | null>({ phase: "fetch", pct: 0 });
   const [err, setErr] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<
-    "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider" | "setup" | "setupdiff" | "apex" | "waterfall"
-  >("readout");
+    "cinema" | "readout" | "laps" | "gg" | "optimal" | "whatif" | "brake" | "slip" | "replay3d" | "piano" | "spider" | "setup" | "setupdiff" | "apex" | "waterfall"
+  >("cinema");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -167,7 +168,7 @@ function WorkbenchPage() {
                 </div>
                 <div className="flex flex-1 flex-col bg-panel">
                   <div className="hairline-b flex items-center gap-px bg-border font-mono text-[11px] uppercase tracking-wider">
-                    {(["readout", "laps", "gg", "optimal", "whatif", "apex", "waterfall", "brake", "slip", "replay3d", "piano", "spider", "setup", "setupdiff"] as const).map((t) => (
+                    {(["cinema", "readout", "laps", "gg", "optimal", "whatif", "apex", "waterfall", "brake", "slip", "replay3d", "piano", "spider", "setup", "setupdiff"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
@@ -177,7 +178,9 @@ function WorkbenchPage() {
                             : "bg-rail text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        {t === "readout"
+                        {t === "cinema"
+                          ? "Cinema"
+                          : t === "readout"
                           ? "Readout"
                           : t === "laps"
                             ? `Laps · ${parsed.laps.length}`
@@ -208,6 +211,7 @@ function WorkbenchPage() {
                     ))}
                   </div>
                   <div className="min-h-0 flex-1">
+                    {bottomTab === "cinema" && <CinemaPlayback parsed={parsed} />}
                     {bottomTab === "readout" && <LiveReadout parsed={parsed} />}
                     {bottomTab === "laps" && <LapList parsed={parsed} />}
                     {bottomTab === "gg" && <GGDiagram parsed={parsed} />}
