@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { useWorkbench } from "@/lib/store";
 
@@ -93,6 +93,8 @@ const MS_TO_KMH = 3.6;
 
 export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
   const { refLap, cmpLap, setCursorTick } = useWorkbench();
+  const [units, setUnits] = useState<"kmh" | "mph">("kmh");
+  const [sortBy, setSortBy] = useState<"order" | "delta" | "apex">("order");
 
   const corners = useMemo(
     () => (refLap != null ? findCorners(parsed, refLap) : null),
@@ -102,6 +104,20 @@ export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
     if (!corners || cmpLap == null) return null;
     return corners.map((c) => sampleSpeedAtPct(parsed, cmpLap, c.pct));
   }, [parsed, corners, cmpLap]);
+
+  // Best apex speed seen across ALL laps at each corner location — useful as
+  // a "personal best apex" reference, just like ATLAS shows.
+  const bestVals = useMemo(() => {
+    if (!corners) return null;
+    return corners.map((c) => {
+      let best = -Infinity;
+      for (const l of parsed.laps) {
+        const v = sampleSpeedAtPct(parsed, l.lap, c.pct);
+        if (v != null && v > best) best = v;
+      }
+      return isFinite(best) ? best : null;
+    });
+  }, [parsed, corners]);
 
   if (refLap == null) {
     return (
@@ -118,13 +134,58 @@ export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
     );
   }
 
+  const factor = units === "kmh" ? 3.6 : 2.23694;
+  const unitLabel = units === "kmh" ? "km/h" : "mph";
   const maxApex = Math.max(...corners.map((c) => c.apexSpeed));
+
+  // Build display rows.
+  const rows = corners.map((c, i) => {
+    const cmpV = cmpVals?.[i] ?? null;
+    const bestV = bestVals?.[i] ?? null;
+    const deltaCmp = cmpV != null ? (cmpV - c.apexSpeed) * factor : null;
+    const deltaBest = bestV != null ? (bestV - c.apexSpeed) * factor : null;
+    return { c, i, cmpV, bestV, deltaCmp, deltaBest };
+  });
+  if (sortBy === "delta" && cmpLap != null) {
+    rows.sort((a, b) => Math.abs(b.deltaCmp ?? 0) - Math.abs(a.deltaCmp ?? 0));
+  } else if (sortBy === "apex") {
+    rows.sort((a, b) => a.c.apexSpeed - b.c.apexSpeed);
+  }
+
+  // Summary: total lost km/h, biggest gain/loss vs cmp.
+  const cmpDeltas = rows.map((r) => r.deltaCmp).filter((v): v is number => v != null);
+  const totalGain = cmpDeltas.filter((d) => d > 0).reduce((a, b) => a + b, 0);
+  const totalLoss = cmpDeltas.filter((d) => d < 0).reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex h-full flex-col">
       <div className="hairline-b flex items-center justify-between px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <span>Min-corner-speed · {corners.length} turns · ref L{refLap}</span>
-        {cmpLap != null && <span>cmp L{cmpLap}</span>}
+        <div className="flex items-center gap-2">
+          {cmpLap != null && (
+            <span>
+              cmp L{cmpLap}{" "}
+              <span className="text-emerald-400">+{totalGain.toFixed(0)}</span>/
+              <span className="text-fuchsia-400">{totalLoss.toFixed(0)}</span> {unitLabel}
+            </span>
+          )}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="rounded-sm border border-border bg-rail px-1 py-0.5 text-[10px]"
+            title="Sort"
+          >
+            <option value="order">Order</option>
+            <option value="apex">Slowest apex</option>
+            {cmpLap != null && <option value="delta">|Δ cmp|</option>}
+          </select>
+          <button
+            onClick={() => setUnits(units === "kmh" ? "mph" : "kmh")}
+            className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] hover:text-foreground"
+          >
+            {unitLabel}
+          </button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <table className="w-full border-collapse font-mono text-[11px]">
@@ -135,29 +196,30 @@ export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
               <th className="px-2 py-1 text-right">Entry</th>
               <th className="px-2 py-1 text-right">Apex</th>
               <th className="px-2 py-1">Apex bar</th>
-              {cmpLap != null && <th className="px-2 py-1 text-right">Δ km/h</th>}
+              <th className="px-2 py-1 text-right" title="Best apex seen across all laps">PB</th>
+              <th className="px-2 py-1 text-right" title="Apex vs PB (negative = leaving time)">Δ PB</th>
+              {cmpLap != null && <th className="px-2 py-1 text-right">Δ cmp</th>}
             </tr>
           </thead>
           <tbody>
-            {corners.map((c, i) => {
-              const cmpV = cmpVals?.[i] ?? null;
-              const delta = cmpV != null ? (cmpV - c.apexSpeed) * MS_TO_KMH : null;
+            {rows.map(({ c, i, bestV, deltaBest, deltaCmp }) => {
               const w = (c.apexSpeed / maxApex) * 100;
               return (
                 <tr
                   key={c.idx}
                   className="hairline-b cursor-pointer hover:bg-accent/40"
                   onClick={() => setCursorTick(c.apexTick)}
+                  title={`Apex tick ${c.apexTick} · entry tick ${c.startTick}`}
                 >
                   <td className="px-2 py-1 text-left">T{c.idx}</td>
                   <td className="px-2 py-1 text-right text-muted-foreground tabular-nums">
                     {(c.pct * 100).toFixed(1)}%
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                    {(c.entrySpeed * MS_TO_KMH).toFixed(0)}
+                    {(c.entrySpeed * factor).toFixed(0)}
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums">
-                    {(c.apexSpeed * MS_TO_KMH).toFixed(0)}
+                    {(c.apexSpeed * factor).toFixed(0)}
                   </td>
                   <td className="px-2 py-1">
                     <div className="h-2 w-full rounded-sm bg-rail">
@@ -167,19 +229,34 @@ export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
                       />
                     </div>
                   </td>
+                  <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
+                    {bestV != null ? (bestV * factor).toFixed(0) : "—"}
+                  </td>
+                  <td
+                    className={`px-2 py-1 text-right tabular-nums ${
+                      deltaBest == null
+                        ? "text-muted-foreground"
+                        : deltaBest > 1
+                          ? "text-fuchsia-400"
+                          : "text-foreground"
+                    }`}
+                    title="km/h slower than the best apex seen"
+                  >
+                    {deltaBest == null ? "—" : `+${deltaBest.toFixed(1)}`}
+                  </td>
                   {cmpLap != null && (
                     <td
                       className={`px-2 py-1 text-right tabular-nums ${
-                        delta == null
+                        deltaCmp == null
                           ? "text-muted-foreground"
-                          : delta > 0.5
+                          : deltaCmp > 0.5
                             ? "text-emerald-400"
-                            : delta < -0.5
+                            : deltaCmp < -0.5
                               ? "text-fuchsia-400"
                               : "text-foreground"
                       }`}
                     >
-                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(1)}`}
+                      {deltaCmp == null ? "—" : `${deltaCmp > 0 ? "+" : ""}${deltaCmp.toFixed(1)}`}
                     </td>
                   )}
                 </tr>
@@ -189,7 +266,7 @@ export function MinCornerSpeed({ parsed }: { parsed: IbtParsed }) {
         </table>
       </div>
       <div className="hairline-t px-3 py-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-        Click a row to jump the cursor to that apex.
+        Click a row to jump the cursor. Δ PB shows km/h left on the table at each apex.
       </div>
     </div>
   );
