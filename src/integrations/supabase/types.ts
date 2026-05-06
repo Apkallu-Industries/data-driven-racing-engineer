@@ -61,6 +61,36 @@ export type Database = {
           },
         ]
       }
+      shared_themes: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          theme: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          theme: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          theme?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       telemetry_sessions: {
         Row: {
           best_lap_s: number | null
