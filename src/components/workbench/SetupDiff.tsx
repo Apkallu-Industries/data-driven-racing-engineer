@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitCompare, Loader2 } from "lucide-react";
+import { GitCompare, Loader2, Flame } from "lucide-react";
 import type { IbtParsed } from "@/lib/ibt/types";
 import { parseCarSetup, diffSetups, type SetupDiff as SetupDiffRow } from "@/lib/ibt/setup";
 import { fetchPbSetup } from "@/server/setup.functions";
@@ -12,6 +12,39 @@ function fmtDelta(d: SetupDiffRow): string | null {
   const abs = Math.abs(value);
   const precision = abs >= 10 ? 1 : abs >= 1 ? 2 : 3;
   return `${sign}${value.toFixed(precision)}${unit ? ` ${unit}` : ""}`;
+}
+
+const TOP_N = 10;
+
+/** Magnitude of a numeric delta normalized by the PB ("a") value so units don't dominate. */
+function deltaMagnitude(d: SetupDiffRow): number {
+  if (!d.numericDelta) return 0;
+  const v = Math.abs(d.numericDelta.value);
+  if (!Number.isFinite(v) || v === 0) return 0;
+  // Normalize against PB value when parseable, else fall back to raw magnitude.
+  const aMatch = d.a?.match(/-?\d+(?:\.\d+)?/);
+  const base = aMatch ? Math.abs(parseFloat(aMatch[0])) : 0;
+  return base > 1e-6 ? v / base : v;
+}
+
+function groupOf(path: string): string {
+  const i = path.indexOf(".");
+  return i < 0 ? "Other" : path.slice(0, i);
+}
+
+const GROUP_ORDER = [
+  "Chassis",
+  "TiresAero",
+  "Tires",
+  "Aero",
+  "Drivetrain",
+  "Brakes",
+  "Dampers",
+  "InCarDials",
+];
+function groupRank(g: string): number {
+  const i = GROUP_ORDER.indexOf(g);
+  return i < 0 ? 99 : i;
 }
 
 export function SetupDiff({
@@ -60,6 +93,28 @@ export function SetupDiff({
     () => (current && pbParsed ? diffSetups(pbParsed, current) : []),
     [current, pbParsed],
   );
+
+  /** Set of paths that are in the top-N biggest numeric deltas. */
+  const topPaths = useMemo(() => {
+    const ranked = diffs
+      .filter((d) => d.numericDelta && d.numericDelta.value !== 0)
+      .map((d) => ({ path: d.path, mag: deltaMagnitude(d) }))
+      .sort((a, b) => b.mag - a.mag)
+      .slice(0, TOP_N);
+    return new Set(ranked.map((r) => r.path));
+  }, [diffs]);
+
+  /** Group diffs by top-level section, ordered by canonical setup-sheet order. */
+  const grouped = useMemo(() => {
+    const m = new Map<string, SetupDiffRow[]>();
+    for (const d of diffs) {
+      const g = groupOf(d.path);
+      const arr = m.get(g);
+      if (arr) arr.push(d);
+      else m.set(g, [d]);
+    }
+    return [...m.entries()].sort(([a], [b]) => groupRank(a) - groupRank(b));
+  }, [diffs]);
 
   if (!current) {
     return (
@@ -115,35 +170,66 @@ export function SetupDiff({
                 <th className="px-3 py-1 text-right font-normal">Δ</th>
               </tr>
             </thead>
-            <tbody>
-              {diffs.map((d) => {
-                const delta = fmtDelta(d);
-                return (
-                  <tr key={d.path} className="hairline-b hover:bg-accent/40">
-                    <td className="truncate px-3 py-0.5 text-muted-foreground" title={d.path}>
-                      {d.path}
-                    </td>
-                    <td className="px-2 py-0.5 text-right tabular-nums text-foreground/70">
-                      {d.a ?? "—"}
-                    </td>
-                    <td className="px-2 py-0.5 text-right tabular-nums text-foreground">
-                      {d.b ?? "—"}
-                    </td>
-                    <td
-                      className={`px-3 py-0.5 text-right tabular-nums ${
-                        delta
-                          ? delta.startsWith("+")
-                            ? "text-[var(--ch-throttle)]"
-                            : "text-[var(--ch-brake)]"
-                          : "text-muted-foreground"
+            {grouped.map(([group, rows]) => (
+              <tbody key={group}>
+                <tr className="bg-rail/60">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground"
+                  >
+                    {group}
+                    <span className="ml-2 text-muted-foreground/60">{rows.length}</span>
+                  </td>
+                </tr>
+                {rows.map((d) => {
+                  const delta = fmtDelta(d);
+                  const isTop = topPaths.has(d.path);
+                  // Strip group prefix for compact display.
+                  const shortPath = d.path.startsWith(group + ".")
+                    ? d.path.slice(group.length + 1)
+                    : d.path;
+                  return (
+                    <tr
+                      key={d.path}
+                      className={`hairline-b hover:bg-accent/40 ${
+                        isTop ? "bg-primary/5" : ""
                       }`}
                     >
-                      {delta ?? "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+                      <td
+                        className="truncate px-3 py-0.5 text-muted-foreground"
+                        title={d.path}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {isTop && (
+                            <Flame className="h-3 w-3 text-primary" aria-label="Top delta" />
+                          )}
+                          <span className={isTop ? "text-foreground" : ""}>{shortPath}</span>
+                        </span>
+                      </td>
+                      <td className="px-2 py-0.5 text-right tabular-nums text-foreground/70">
+                        {d.a ?? "—"}
+                      </td>
+                      <td className="px-2 py-0.5 text-right tabular-nums text-foreground">
+                        {d.b ?? "—"}
+                      </td>
+                      <td
+                        className={`px-3 py-0.5 text-right tabular-nums ${
+                          isTop ? "font-semibold" : ""
+                        } ${
+                          delta
+                            ? delta.startsWith("+")
+                              ? "text-[var(--ch-throttle)]"
+                              : "text-[var(--ch-brake)]"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {delta ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            ))}
           </table>
         </div>
       )}
