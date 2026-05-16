@@ -104,36 +104,63 @@ function WorkbenchPage() {
         {parsed && (
           <>
             <span className="text-muted-foreground">·</span>
-            <label className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Lap</span>
-              <select
-                value={refLap ?? ""}
-                onChange={(e) => setRefLap(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                className="rounded-sm border border-border bg-rail px-2 py-0.5 font-mono text-xs"
-              >
-                <option value="">All</option>
-                {parsed.laps.map((l) => (
-                  <option key={l.lap} value={l.lap}>
-                    Lap {l.lap} · {l.timeS.toFixed(3)}s
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">vs</span>
-              <select
-                value={cmpLap ?? ""}
-                onChange={(e) => setCmpLap(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                className="rounded-sm border border-border bg-rail px-2 py-0.5 font-mono text-xs"
-              >
-                <option value="">—</option>
-                {parsed.laps.map((l) => (
-                  <option key={l.lap} value={l.lap}>
-                    Lap {l.lap} · {l.timeS.toFixed(3)}s
-                  </option>
-                ))}
-              </select>
-            </label>
+            {(() => {
+              const valid = parsed.laps
+                .filter((l) => l.endTick - l.startTick > 30 && l.timeS > 5)
+                .slice()
+                .sort((a, b) => a.timeS - b.timeS);
+              const invalid = parsed.laps.filter(
+                (l) => !(l.endTick - l.startTick > 30 && l.timeS > 5),
+              );
+              const renderOpts = (
+                <>
+                  {valid.map((l, i) => (
+                    <option key={`v${l.lap}`} value={l.lap}>
+                      {i === 0 ? "★ " : ""}Lap {l.lap} · {l.timeS.toFixed(3)}s
+                      {i === 0 ? " (best)" : ""}
+                    </option>
+                  ))}
+                  {invalid.length > 0 && (
+                    <option disabled>──────────</option>
+                  )}
+                  {invalid.map((l) => (
+                    <option key={`i${l.lap}`} value={l.lap}>
+                      Lap {l.lap} · in/out
+                    </option>
+                  ))}
+                </>
+              );
+              return (
+                <>
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Lap</span>
+                    <select
+                      value={refLap ?? ""}
+                      onChange={(e) =>
+                        setRefLap(e.target.value === "" ? null : parseInt(e.target.value, 10))
+                      }
+                      className="rounded-sm border border-border bg-rail px-2 py-0.5 font-mono text-xs"
+                    >
+                      <option value="">All</option>
+                      {renderOpts}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">vs</span>
+                    <select
+                      value={cmpLap ?? ""}
+                      onChange={(e) =>
+                        setCmpLap(e.target.value === "" ? null : parseInt(e.target.value, 10))
+                      }
+                      className="rounded-sm border border-border bg-rail px-2 py-0.5 font-mono text-xs"
+                    >
+                      <option value="">—</option>
+                      {renderOpts}
+                    </select>
+                  </label>
+                </>
+              );
+            })()}
             <ShareButton sessionId={id} />
           </>
         )}
