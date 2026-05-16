@@ -61,6 +61,7 @@ export function AICoach({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConciseResult | DetailedResult | null>(null);
   const [resultDetailed, setResultDetailed] = useState(false);
+  const [fallback, setFallback] = useState<string | null>(null);
   const [useHistory, setUseHistory] = useState(true);
   const [historyMatches, setHistoryMatches] = useState<number | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -123,12 +124,13 @@ export function AICoach({
         history as never,
       );
       const resp = await analyzeTelemetry({ data: { payload, detailed } });
-      const r = resp as { error?: string; result?: unknown; detailed?: boolean };
+      const r = resp as { error?: string; result?: unknown; detailed?: boolean; fallback?: string };
       if (r.error) {
         setError(r.error);
       } else if (r.result) {
         setResult(r.result as ConciseResult | DetailedResult);
         setResultDetailed(!!r.detailed);
+        setFallback(r.fallback ?? null);
       } else {
         setError("Unexpected response from AI coach.");
       }
@@ -306,6 +308,11 @@ export function AICoach({
           )}
           {result && resultDetailed && "corners" in result && (
             <DetailedView data={result as DetailedResult} />
+          )}
+          {result && fallback && (
+            <div className="mt-2 rounded-sm border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-amber-300/80">
+              AI gateway gave no useful reply — these tips were generated locally from your physics + counterfactual zones. Click Analyze again to retry the live model.
+            </div>
           )}
         </div>
       )}
