@@ -133,6 +133,12 @@ function SessionsPage() {
               <div className="h-full bg-primary transition-all" style={{ width: `${progress.pct}%` }} />
             </div>
           )}
+          {busy && progress && progress.pct >= 90 && (
+            <p className="mt-2 max-w-sm text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
+              Large .ibt files can sit at ~95% for a while while uploading and
+              indexing. This is normal — don't close this tab.
+            </p>
+          )}
           <input
             ref={fileRef}
             type="file"
