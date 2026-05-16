@@ -71,7 +71,20 @@ export function Timeline({ parsed }: { parsed: IbtParsed }) {
         </div>
       </div>
       <div className="font-mono text-xs tabular-nums text-muted-foreground">
-        {cursorTick} / {total - 1}
+        {(() => {
+          const st = parsed.channels["SessionTime"]?.data;
+          const t = st ? st[cursorTick] - st[0] : cursorTick / parsed.meta.tickRate;
+          const lap = parsed.laps.find((l) => cursorTick >= l.startTick && cursorTick <= l.endTick);
+          const m = Math.floor(t / 60);
+          const s = (t - m * 60).toFixed(2).padStart(5, "0");
+          return (
+            <>
+              {lap ? `L${lap.lap} · ` : ""}
+              <span className="text-foreground">{m}:{s}</span>
+              <span className="ml-2 opacity-60">{cursorTick}/{total - 1}</span>
+            </>
+          );
+        })()}
       </div>
     </div>
   );
