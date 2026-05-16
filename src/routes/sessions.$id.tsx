@@ -152,6 +152,12 @@ function WorkbenchPage() {
           <div className="h-1 w-72 overflow-hidden rounded-full bg-rail">
             <div className="h-full bg-primary transition-all" style={{ width: `${progress?.pct ?? 0}%` }} />
           </div>
+          {(progress?.pct ?? 0) >= 90 && (
+            <div className="max-w-sm text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
+              Large .ibt files can sit at ~95% for a while as channels are
+              indexed. This is normal — keep this tab open.
+            </div>
+          )}
         </div>
       ) : (
         <>
