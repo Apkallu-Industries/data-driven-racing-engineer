@@ -129,8 +129,14 @@ export function CinemaPlayback({ parsed }: { parsed: IbtParsed }) {
     return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 1 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
   })();
 
-  // Steering wheel rotation: degrees, capped at ±180 visually.
-  const steerDeg = Math.max(-360, Math.min(360, (steerRad / Math.max(0.1, steerMax)) * 180));
+  // Steering wheel rotation: degrees, capped at ±360 visually.
+  // iRacing's SteeringWheelAngle is positive for LEFT turns. A CSS rotate
+  // with a positive angle rotates clockwise (i.e. to the right) — so the
+  // raw value must be negated for the wheel to mirror the driver's input.
+  const steerDeg = -Math.max(
+    -360,
+    Math.min(360, (steerRad / Math.max(0.1, steerMax)) * 180),
+  );
 
   // Lap progress arc.
   const progPath = (() => {
