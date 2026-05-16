@@ -60,17 +60,35 @@ interface WorkbenchState {
 
 export const useWorkbench = create<WorkbenchState>((set) => ({
   parsed: null,
-  setParsed: (p) =>
+  setParsed: (p) => {
+    // Default refLap = fastest valid lap (skip in/out & corrupt laps).
+    let bestLap: number | null = null;
+    if (p && p.laps.length) {
+      let bestT = Infinity;
+      for (const l of p.laps) {
+        const valid = l.endTick - l.startTick > 30 && l.timeS > 5;
+        if (valid && l.timeS < bestT) {
+          bestT = l.timeS;
+          bestLap = l.lap;
+        }
+      }
+      if (bestLap == null) bestLap = p.laps[0].lap;
+    }
+    // Cursor starts at the fastest lap so widgets reflect the best run.
+    const startTick = bestLap != null
+      ? (p!.laps.find((l) => l.lap === bestLap)?.startTick ?? 0)
+      : 0;
     set(() => ({
       parsed: p,
-      cursorTick: 0,
+      cursorTick: startTick,
       selectedChannels: p
         ? DEFAULT_CHANNELS.filter((c) => c in p.channels)
         : [],
-      refLap: p && p.laps.length ? p.laps[0].lap : null,
+      refLap: bestLap,
       cmpLap: null,
       playing: false,
-    })),
+    }));
+  },
   cursorTick: 0,
   setCursorTick: (t) => set({ cursorTick: t }),
   selectedChannels: [],
