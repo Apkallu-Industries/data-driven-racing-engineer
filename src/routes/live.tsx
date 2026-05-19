@@ -1,0 +1,228 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { AppHeader } from "@/components/AppHeader";
+import { useAuth } from "@/lib/auth";
+import { useLiveBridge } from "@/lib/liveBridge";
+import { DEFAULT_CHANNELS, colorForChannel } from "@/lib/store";
+import { CHANNEL_GROUPS } from "@/lib/ibt/channelCatalog";
+
+export const Route = createFileRoute("/live")({
+  head: () => ({
+    meta: [
+      { title: "Live Bridge — ApexTrace" },
+      {
+        name: "description",
+        content:
+          "Stream live iRacing telemetry into ApexTrace from the local bridge.",
+      },
+    ],
+  }),
+  component: LivePage,
+});
+
+function LivePage() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const {
+    url,
+    setUrl,
+    status,
+    error,
+    values,
+    channelNames,
+    sessionTime,
+    lap,
+    hz,
+    connect,
+    disconnect,
+  } = useLiveBridge();
+  const [draftUrl, setDraftUrl] = useState(url);
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    if (!loading && !user) navigate({ to: "/auth" });
+  }, [user, loading, navigate]);
+
+  // Auto-connect once on mount if we have a URL and we're idle.
+  useEffect(() => {
+    if (status === "disconnected") connect(url);
+    return () => {
+      // keep connection alive when navigating away? disconnect on unmount for now
+      disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = useMemo(() => {
+    const f = filter.trim().toLowerCase();
+    return channelNames.filter((n) => !f || n.toLowerCase().includes(f));
+  }, [channelNames, filter]);
+
+  const featured = useMemo(
+    () => DEFAULT_CHANNELS.filter((n) => n in values),
+    [values],
+  );
+
+  const groupOf = (name: string) => {
+    for (const [g, list] of Object.entries(CHANNEL_GROUPS)) {
+      if ((list as readonly string[]).includes(name)) return g;
+    }
+    return "Other";
+  };
+
+  return (
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <AppHeader>
+        <span className="font-mono uppercase tracking-wider">Live Bridge</span>
+        <span className="text-muted-foreground">·</span>
+        <span
+          className={
+            status === "connected"
+              ? "font-mono text-emerald-400"
+              : status === "connecting"
+                ? "font-mono text-amber-400"
+                : status === "error"
+                  ? "font-mono text-destructive"
+                  : "font-mono text-muted-foreground"
+          }
+        >
+          ● {status}
+        </span>
+        {status === "connected" && (
+          <>
+            <span className="text-muted-foreground">·</span>
+            <span className="font-mono tabular-nums">{hz} Hz</span>
+            {sessionTime != null && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="font-mono tabular-nums">
+                  t = {sessionTime.toFixed(2)}s
+                </span>
+              </>
+            )}
+            {lap != null && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="font-mono">lap {lap}</span>
+              </>
+            )}
+          </>
+        )}
+      </AppHeader>
+
+      <div className="hairline-b flex items-center gap-2 bg-panel px-3 py-2">
+        <input
+          className="w-72 rounded-sm border border-border bg-rail px-2 py-1 font-mono text-xs"
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          placeholder="ws://localhost:3001"
+        />
+        <button
+          onClick={() => {
+            setUrl(draftUrl);
+            connect(draftUrl);
+          }}
+          className="rounded-sm border border-border bg-primary px-3 py-1 font-mono text-xs uppercase tracking-wider text-primary-foreground hover:opacity-90"
+        >
+          Connect
+        </button>
+        <button
+          onClick={() => disconnect()}
+          className="rounded-sm border border-border bg-rail px-3 py-1 font-mono text-xs uppercase tracking-wider hover:bg-accent"
+        >
+          Disconnect
+        </button>
+        <div className="ml-4 flex-1 text-xs text-muted-foreground">
+          Start the bridge locally (<code className="font-mono">npm start</code>{" "}
+          in the iracing-bridge folder) then connect. Channel names match the
+          ones used in uploaded .ibt files.
+        </div>
+        <input
+          className="w-56 rounded-sm border border-border bg-rail px-2 py-1 font-mono text-xs"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="filter channels…"
+        />
+      </div>
+
+      {error && (
+        <div className="bg-destructive/15 px-3 py-1.5 font-mono text-[11px] text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
+        {/* Featured tiles */}
+        <div className="hairline-r w-2/5 overflow-auto bg-background p-3">
+          <div className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            Live Readout
+          </div>
+          {featured.length === 0 ? (
+            <div className="rounded-sm border border-border bg-panel p-6 text-center text-xs text-muted-foreground">
+              Waiting for telemetry frames…
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {featured.map((name) => {
+                const v = values[name];
+                return (
+                  <div
+                    key={name}
+                    className="rounded-sm border border-border bg-panel p-3"
+                  >
+                    <div
+                      className="font-mono text-[10px] uppercase tracking-wider"
+                      style={{ color: colorForChannel(name) }}
+                    >
+                      {name}
+                    </div>
+                    <div className="mt-1 font-mono text-2xl tabular-nums">
+                      {Number.isFinite(v) ? v.toFixed(2) : "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* All channels */}
+        <div className="min-w-0 flex-1 overflow-auto bg-background p-3">
+          <div className="mb-2 flex items-center justify-between font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            <span>All Channels</span>
+            <span className="tabular-nums">{filtered.length} / {channelNames.length}</span>
+          </div>
+          <div className="overflow-hidden rounded-sm border border-border">
+            <table className="w-full font-mono text-xs">
+              <thead className="bg-rail text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1 text-left">Channel</th>
+                  <th className="px-2 py-1 text-left">Group</th>
+                  <th className="px-2 py-1 text-right">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((name) => {
+                  const v = values[name];
+                  return (
+                    <tr key={name} className="border-t border-border/50">
+                      <td className="px-2 py-1" style={{ color: colorForChannel(name) }}>
+                        {name}
+                      </td>
+                      <td className="px-2 py-1 text-muted-foreground">
+                        {groupOf(name)}
+                      </td>
+                      <td className="px-2 py-1 text-right tabular-nums">
+                        {Number.isFinite(v) ? v.toFixed(3) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
