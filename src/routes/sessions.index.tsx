@@ -102,6 +102,9 @@ function SessionsPage() {
         <Link to="/fingerprint" className="ml-3 text-muted-foreground hover:text-foreground">
           Fingerprint
         </Link>
+        <Link to="/live" className="ml-3 text-emerald-400 hover:text-emerald-300">
+          ● Live Bridge
+        </Link>
       </AppHeader>
 
       <main className="mx-auto max-w-7xl p-6">

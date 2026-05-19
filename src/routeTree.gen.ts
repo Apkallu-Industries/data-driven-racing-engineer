@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as FingerprintRouteImport } from './routes/fingerprint'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -19,6 +20,11 @@ import { Route as SessionsIdRouteImport } from './routes/sessions.$id'
 import { Route as LabLapfileRouteImport } from './routes/lab.lapfile'
 import { Route as ApiPublicOgShareTokenRouteImport } from './routes/api/public/og/share.$token'
 
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HowItWorksRoute = HowItWorksRouteImport.update({
   id: '/how-it-works',
   path: '/how-it-works',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/live': typeof LiveRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/live': typeof LiveRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/live': typeof LiveRoute
   '/lab/lapfile': typeof LabLapfileRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/fingerprint'
     | '/how-it-works'
+    | '/live'
     | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/fingerprint'
     | '/how-it-works'
+    | '/live'
     | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/fingerprint'
     | '/how-it-works'
+    | '/live'
     | '/lab/lapfile'
     | '/sessions/$id'
     | '/share/$token'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   FingerprintRoute: typeof FingerprintRoute
   HowItWorksRoute: typeof HowItWorksRoute
+  LiveRoute: typeof LiveRoute
   LabLapfileRoute: typeof LabLapfileRoute
   SessionsIdRoute: typeof SessionsIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -149,6 +162,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/how-it-works': {
       id: '/how-it-works'
       path: '/how-it-works'
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   FingerprintRoute: FingerprintRoute,
   HowItWorksRoute: HowItWorksRoute,
+  LiveRoute: LiveRoute,
   LabLapfileRoute: LabLapfileRoute,
   SessionsIdRoute: SessionsIdRoute,
   ShareTokenRoute: ShareTokenRoute,
