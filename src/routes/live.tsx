@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/lib/auth";
 import { useLiveBridge } from "@/lib/liveBridge";
 import { DEFAULT_CHANNELS, colorForChannel } from "@/lib/store";
-import { CHANNEL_GROUPS } from "@/lib/ibt/channelCatalog";
+import { catalogEntry } from "@/lib/ibt/channelCatalog";
 
 export const Route = createFileRoute("/live")({
   head: () => ({
@@ -63,12 +63,7 @@ function LivePage() {
     [values],
   );
 
-  const groupOf = (name: string) => {
-    for (const [g, list] of Object.entries(CHANNEL_GROUPS)) {
-      if ((list as readonly string[]).includes(name)) return g;
-    }
-    return "Other";
-  };
+  const groupOf = (name: string) => catalogEntry(name)?.group ?? "Other";
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
