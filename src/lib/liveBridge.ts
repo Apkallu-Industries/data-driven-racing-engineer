@@ -31,6 +31,10 @@ interface LiveBridgeState {
   hz: number;            // measured update rate
   lastFrameAt: number;   // performance.now()
 
+  /** Last N raw inbound messages (string), newest first. For debugging. */
+  rawLog: string[];
+  clearRawLog: () => void;
+
   connect: (url?: string) => void;
   disconnect: () => void;
 }
@@ -40,6 +44,7 @@ let frameCounter = 0;
 let hzTimer: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let manuallyClosed = false;
+const RAW_LOG_MAX = 25;
 
 function normalizeFrame(msg: unknown): {
   values: LiveValues;
@@ -106,6 +111,8 @@ export const useLiveBridge = create<LiveBridgeState>((set, get) => ({
   lap: null,
   hz: 0,
   lastFrameAt: 0,
+  rawLog: [],
+  clearRawLog: () => set({ rawLog: [] }),
 
   connect: (url) => {
     const target = url ?? get().url;
@@ -128,13 +135,19 @@ export const useLiveBridge = create<LiveBridgeState>((set, get) => ({
     };
     ws.onmessage = (ev) => {
       let parsed: unknown;
+      const raw = typeof ev.data === "string" ? ev.data : "[binary]";
+      const nextLog = [raw, ...get().rawLog].slice(0, RAW_LOG_MAX);
       try {
         parsed = typeof ev.data === "string" ? JSON.parse(ev.data) : null;
       } catch {
+        set({ rawLog: nextLog });
         return;
       }
       const frame = normalizeFrame(parsed);
-      if (!frame) return;
+      if (!frame) {
+        set({ rawLog: nextLog });
+        return;
+      }
       frameCounter += 1;
       const merged = { ...get().values, ...frame.values };
       set({
@@ -143,6 +156,7 @@ export const useLiveBridge = create<LiveBridgeState>((set, get) => ({
         sessionTime: frame.sessionTime ?? get().sessionTime,
         lap: frame.lap ?? get().lap,
         lastFrameAt: performance.now(),
+        rawLog: nextLog,
       });
     };
 
