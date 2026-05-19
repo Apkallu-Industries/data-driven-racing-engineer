@@ -35,9 +35,12 @@ function LivePage() {
     hz,
     connect,
     disconnect,
+    rawLog,
+    clearRawLog,
   } = useLiveBridge();
   const [draftUrl, setDraftUrl] = useState(url);
   const [filter, setFilter] = useState("");
+  const [showRaw, setShowRaw] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -144,6 +147,53 @@ function LivePage() {
         <div className="bg-destructive/15 px-3 py-1.5 font-mono text-[11px] text-destructive">
           {error}
         </div>
+      )}
+
+      {showRaw && (
+        <div className="hairline-b max-h-56 overflow-auto bg-black/40 p-2 font-mono text-[10px] leading-relaxed text-emerald-300">
+          <div className="mb-1 flex items-center justify-between text-muted-foreground">
+            <span>RAW FRAMES (newest first · {rawLog.length})</span>
+            <span className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(rawLog.slice(0, 5).join("\n\n"));
+                }}
+                className="rounded-sm border border-border px-2 py-0.5 hover:bg-accent"
+              >
+                Copy first 5
+              </button>
+              <button
+                onClick={clearRawLog}
+                className="rounded-sm border border-border px-2 py-0.5 hover:bg-accent"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowRaw(false)}
+                className="rounded-sm border border-border px-2 py-0.5 hover:bg-accent"
+              >
+                Hide
+              </button>
+            </span>
+          </div>
+          {rawLog.length === 0 ? (
+            <div className="text-muted-foreground">No messages received yet.</div>
+          ) : (
+            rawLog.map((m, i) => (
+              <div key={i} className="border-t border-white/5 py-0.5">
+                {m.length > 800 ? m.slice(0, 800) + " …(truncated)" : m}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+      {!showRaw && (
+        <button
+          onClick={() => setShowRaw(true)}
+          className="hairline-b bg-panel px-3 py-1 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        >
+          Show raw frames ▾
+        </button>
       )}
 
       <div className="flex min-h-0 flex-1">
