@@ -36,7 +36,7 @@ function LiveWorkbenchPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { parsed, setParsed, setCursorTick } = useWorkbench();
-  const { status, hz, lap, sessionTime, connect, disconnect, url, tickCount } = useLiveBridge();
+  const { status, hz, lap, sessionTime, connect, url, tickCount } = useLiveBridge();
   const [bottomTab, setBottomTab] = useState<
     "cinema" | "readout" | "laps" | "gg" | "brake" | "slip" | "piano"
   >("cinema");
