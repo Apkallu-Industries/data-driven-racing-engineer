@@ -95,7 +95,7 @@ function writeSample(name: string, value: number, tick: number) {
     const data = new Float32Array(HISTORY_CAPACITY);
     data.fill(NaN);
     const cat = catalogEntry(name);
-    ring = { data, unit: cat?.unit ?? "", group: cat?.group ?? "Live" };
+    ring = { data, unit: "", group: cat?.group ?? "Live" };
     HISTORY.set(name, ring);
   }
   ring.data[tick % HISTORY_CAPACITY] = value;
