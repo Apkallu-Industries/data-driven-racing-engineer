@@ -1,150 +1,64 @@
+## Problem
 
-# iRacing .ibt Telemetry Workbench (MoTeC i2 Style)
+The hosted preview (`https://...lovable.app`) cannot open `ws://localhost:3001` — browsers block insecure WebSockets from HTTPS pages ("mixed content"). That's the only reason `/live` shows `WebSocket error` with zero frames; the bridge itself is healthy.
 
-A full telemetry analysis app modeled on the MoTeC i2 Pro workspace: dark technical UI, stacked time-series traces, reconstructed track map, lap-by-lap overlay, and a searchable channel browser exposing every variable in the .ibt file.
+## Approach
 
-## Visual Direction — MoTeC HD Workspace
+Run the ApexTrace dev server on the same machine as the bridge, so the page is served over `http://localhost` and is allowed to talk to `ws://localhost:3001`. Then wire the live feed into the existing widgets.
 
-- Dark charcoal background (`#1a1d21`), panel surfaces `#22262b`, hairline borders `#2f343a`
-- Monospace numerics (JetBrains Mono), compact sans UI (Inter)
-- Channel-coded trace colors: Speed cyan, Throttle green, Brake red, RPM yellow, Steering magenta, Gear white
-- Dense, information-first layout — no rounded card padding, tight 1px borders, gridded charts with minor/major ticks
-- A vertical "time cursor" line that spans every stacked chart and the track map simultaneously
+## Steps
 
-## App Structure
+### 1. Local dev mode docs + UX (no transport change needed)
 
-```text
-/                     Landing + drag-drop upload (signed-out: marketing; signed-in: redirect to /sessions)
-/auth                 Email + password (Lovable Cloud)
-/sessions             Library of uploaded .ibt sessions (cards: track, car, date, duration, laps)
-/sessions/$id         The MoTeC workbench (the main view)
-```
+- Add a short banner on `/live` that detects when the page origin is `https:` AND the bridge URL is `ws://` (not `wss://`). Show: *"Browsers block insecure WebSockets from this hosted page. Run ApexTrace locally (`npm run dev`) and open http://localhost:5173/live, or expose the bridge over wss://."*
+- Add a "Copy local-dev instructions" link with the 3 commands.
 
-## The Workbench (`/sessions/$id`)
+### 2. Confirm frame shape on first connect
 
-Four-pane layout:
+You'll run locally, hit Connect, and the existing **RAW FRAMES** panel will show what `server.js` is broadcasting. The current `normalizeFrame()` already handles the four most common shapes, but if your bridge uses a custom envelope (e.g. `{t,v:[...]}` or binary), I'll tighten it once we see one frame.
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│  Header: Track · Car · Session date · Lap selector · Compare  │
-├──────────────┬────────────────────────────────────────────────┤
-│              │  Stacked Trace Charts (the core view)          │
-│  Channel     │   ── Speed ───────────────────────────────     │
-│  Browser     │   ── Throttle / Brake ────────────────────     │
-│  (left rail) │   ── RPM / Gear ──────────────────────────     │
-│              │   ── Steering ────────────────────────────     │
-│  search +    │   ── G-Force (Lat/Long) ──────────────────     │
-│  tree of     │   shared time cursor across all panes          │
-│  ~250 chans  ├────────────────────────────────────────────────┤
-│              │  Track map  │  Live values readout (gauges)    │
-│              │  (X/Y from  │  Speed 187 mph · Thr 84% · ...   │
-│              │  position)  │  shows values at cursor frame    │
-├──────────────┴─────────────┴──────────────────────────────────┤
-│  Timeline scrubber: full session, lap markers, play/pause     │
-└───────────────────────────────────────────────────────────────┘
-```
+### 3. Wire live values into the workbench widgets
 
-### Channel Browser (left rail)
-- Search box, grouped tree (Driver Inputs, Vehicle, Engine, Tires, Suspension, Session, Environment)
-- Each row: name, unit, current-value-at-cursor, min/max/avg for current lap
-- Click to add/remove from the stacked trace area; drag to reorder
+Create a `useLiveOrIbtChannel(name)` selector that returns:
+- the live value from `useLiveBridge().values[name]` when status === `connected` and no `.ibt` is loaded
+- otherwise the existing `parsed.channels[name].data[cursorTick]`
 
-### Stacked Traces (center)
-- Each channel gets its own horizontal strip with its own Y-axis
-- X-axis = time (or distance, toggleable)
-- Synchronized time cursor — moving it on any chart moves all of them and updates the track map dot and live readouts
-- Hover tooltip shows exact value + timestamp + lap
+Apply it to the widgets that already read single-sample values:
+- `LiveReadout` tiles
+- `CinemaPlayback` HUD (Speed / RPM / Throttle / Brake / Gear / Steering)
+- `GGDiagram` current dot (LatAccel / LongAccel)
+- `BrakeBias` instantaneous bar
+- `SlipAngle` indicator
+- `TrackMap` car dot (Lat / Lon or LapDistPct)
 
-### Track Map (bottom-left)
-- Reconstructed by integrating VelocityX/Y or using Lat/Lon if present
-- Animated dot showing car position at cursor
-- Color the racing line by selected channel (e.g. throttle = green→red gradient) — toggle in toolbar
+Trace widgets (`StackedTraces`, `PianoRoll`, `TimeLossWaterfall`) need a history buffer, covered next.
 
-### Lap Comparison
-- Pick "Reference Lap" + "Compare Lap" from the lap dropdown
-- Each trace shows two overlaid lines (solid + dashed)
-- Track map shows two dots and two colored lines
-- Delta-time strip added at top: cumulative time gap vs reference
+### 4. Rolling buffer for traces (~60 s)
 
-### Timeline + Playback
-- Full-session scrubber across the bottom with lap-boundary tick marks
-- Play / pause / 0.25× / 1× / 2× / 4× speed
-- All visualizations animate in lockstep driven by current frame index
+Add to `liveBridge.ts`:
+- `history: Record<string, Float32Array>` ring buffer per channel, sized `60 s * 60 Hz = 3600` samples.
+- Push every incoming frame; expose `getHistory(name): {data, t0, t1}`.
+- `StackedTraces` and `PianoRoll` get a `liveMode` prop that reads from the ring buffer instead of `parsed`.
 
-## .ibt Parsing
+### 5. "Go Live" entry point
 
-Pure TypeScript parser running in the browser (Web Worker so the UI stays responsive on 50 MB+ files):
+- In `sessions.index`, add a **Go Live** card next to the upload zone that links to `/live`.
+- In `/live`, once frames are flowing, add an **Open Workbench (Live)** button that routes to `sessions.$id` with `id="live"` and a flag that swaps the data source to the live bridge.
 
-1. Read header (112 bytes) — `ver`, `tickRate`, `numVars`, `varHeaderOffset`, `bufLen`, `sessionInfoLen/Offset`, `varBuf[0].bufOffset`
-2. Read `numVars` × 144-byte var headers → `{name, type, offset, count, unit}`
-3. Parse session-info YAML to get track name, car, driver, weather, lap times
-4. Stream tick records, decoding each field per its type (bool/int/float/double)
-5. Index data by lap using the `Lap` channel for fast lap selection
-6. Return: metadata + per-channel `Float32Array` (one value per tick) + lap boundaries
+### 6. Lap detection from live stream
 
-Type codes handled: `1=bool`, `2=int32`, `3=bitfield`, `4=float`, `5=double`, plus arrays via `count`.
+Bridge log shows `LapCompleted`/`Lap` are available. On each Lap increment, snapshot the buffer between the two lap boundaries into an in-memory "lap" so `LapList` and best-lap logic work live. No persistence yet.
 
-## Account & Storage (Lovable Cloud)
+## Technical notes
 
-- Email + password + Google sign-in
-- `sessions` table: `id, user_id, track, car, recorded_at, duration_s, lap_count, tick_rate, file_size, storage_path`
-- `.ibt` file uploaded to Cloud Storage bucket (`telemetry`), private with RLS — only owner can read
-- On open: download the file blob, parse in worker, cache parsed result in IndexedDB so reopening is instant
+- All changes are client-side; no server functions or migrations.
+- `useLiveBridge` already auto-reconnects and tracks `hz`; reuse for status pills.
+- The reverse-steering fix and timeline-cursor wiring already applied to `.ibt` stay untouched — live mode bypasses `cursorTick` entirely.
+- Persisting live sessions to Supabase is **out of scope** for this pass.
 
-## Tech
+## Out of scope (ask later if needed)
 
-- TanStack Start + React 19, Tailwind v4, shadcn primitives where useful
-- **uPlot** for the stacked traces (handles 100k+ points at 60fps, MoTeC-grade rendering)
-- Custom SVG track map and gauges (small, controllable)
-- Web Worker for parsing; transferable `ArrayBuffer` to keep memory tight
-- Zustand for cursor position / selected channels / lap selection (shared across panes)
-
-## Next-Generation Roadmap
-
-Status legend: ✅ shipped · 🟡 partial · ⬜ todo. All features must stay rooted in real measured data — derived/predicted values are fine when stitched from real samples; no fabricated curves.
-
-### Tier 1 — Differentiators
-1. **Physics-derived virtual channels**
-   - ✅ g-g diagram (LatAccel vs LongAccel) with empirical grip envelope (`GGDiagram.tsx`)
-   - ✅ Theoretical optimal lap from best micro-sectors (`OptimalLap.tsx`)
-   - ✅ Brake response & bias — median decel-per-pedal-bin + linearity R² + dcBrakeBias (`BrakeBias.tsx`)
-   - ✅ Body slip angle β from VelocityX/VelocityY + balance signature (`SlipAngle.tsx`)
-   - ⬜ Tyre energy / sliding work per corner
-2. **AI Coach v2 — grounded, not hallucinated**
-   - ✅ Counterfactual coach with measured per-zone deltas + confidence scoring (`Counterfactuals.tsx`)
-   - ✅ Physics re-integration: g-g, brake bias, slip β, counterfactual zones now feed the coach payload (`lib/coach/physics.ts`)
-   - ✅ Cross-session retrieval (same track + car): best-ever, recent, trend (`server/history.functions.ts`)
-   - ✅ Voice debrief via ElevenLabs TTS — opt-in "Speak" button on coach output (`server/tts.functions.ts`)
-3. **Driver DNA / fingerprint** ⬜
-   - Cluster style across sessions; compare to past self / anonymised community baseline
-
-### Tier 2 — Visualisation
-4. **3D track replay** (Three.js / R3F) ✅ — elevation-aware (uses Alt channel when present), ref + ghost compare car, orbit/zoom (`ReplayThree.tsx`)
-5. **Heatmap minimap with time-delta gradient** ✅ — TrackMap now supports Δt-vs-ref color mode + speed-driven line thickness toggle
-6. **Brake/throttle "piano roll"** ✅ — MIDI-style stacked throttle/brake bars across distance for N laps (`PianoRoll.tsx`)
-7. **Sector "spider" radar** ✅ — per-sector polygons: entry/min/exit speed, brake G, throttle-on, steer smoothness, ref vs cmp (`SectorSpider.tsx`)
-
-### Tier 3 — Platform moat
-8. **Setup-aware analysis** ⬜ — parse iRacing setup export; correlate changes to outcomes
-9. **Live ingest via IRSDK/UDP** ⬜ — companion app → Lovable Cloud → real-time coaching
-10. **Shareable lap links** ✅ — `shared_laps` table + `/share/$token` public route. Owner-only `createShareLink`, public `getSharedLap` returns 1h signed `.ibt` URL. Read-only viewer renders TrackMap + 3D + Piano + Spider, locked to ref/cmp lap (`server/share.functions.ts`)
-
-### Recently shipped (supporting)
-- g-g diagram, Optimal Lap, Counterfactual What-if with confidence scoring
-- AI Coach (single/compare/session, brief/detailed toggle)
-- Security hardening: RLS audit fixes, CSP headers
-- Installable PWA (manifest-only, no SW) + "Install app" CTA on landing
-- Cross-panel sticky ref/cmp lap selector (workbench header drives TrackMap, 3D, Piano, Spider)
-- 3D ghost toggle + sync-scrub slider (cursor mapped via LapDistPct)
-- Export buttons: TrackMap (PNG/SVG), Piano (PNG/SVG), Spider (PNG composite), 3D (PNG)
-
-### Suggested next sprint
-1. Physics counterfactual ("brake 5m later → +Δs") on top of existing What-if zones
-2. 3D track replay (R3F) — biggest demo/marketing payoff
-3. Driver DNA fingerprint — retention hook once multi-session history exists
-
-## Scope for v1
-
-Included: parser, all 5 chosen features (channel browser, track map, lap compare, multi-channel charts, timeline playback), upload + account, full MoTeC dark aesthetic.
-
-Not in v1 (easy follow-ups): math channels, distance-based X-axis (toggle stub only), session sharing links, CSV export, multi-file/multi-driver overlay.
+- TLS/wss on the bridge itself
+- Cloudflare/ngrok tunnel docs
+- Recording a live session to a `.ibt`-equivalent for replay
+- AI Coach over live stream (currently expects a parsed file)

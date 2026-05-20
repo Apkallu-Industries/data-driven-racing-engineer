@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { AppHeader } from "@/components/AppHeader";
-import { Upload, Trash2, Clock, Flag, Car, MapPin } from "lucide-react";
+import { Upload, Trash2, Clock, Flag, Car, MapPin, Radio } from "lucide-react";
 import { uploadAndIndexIbt } from "@/lib/uploadIbt";
 import { toast } from "sonner";
 
@@ -109,6 +109,7 @@ function SessionsPage() {
 
       <main className="mx-auto max-w-7xl p-6">
         {/* Upload zone */}
+        <div className="mb-6 grid gap-3 md:grid-cols-[1fr_280px]">
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
@@ -119,7 +120,7 @@ function SessionsPage() {
             if (f) handleFile(f);
           }}
           onClick={() => fileRef.current?.click()}
-          className={`hairline mb-6 flex cursor-pointer flex-col items-center justify-center rounded-sm bg-panel py-12 transition-colors ${drag ? "border-primary bg-accent" : "hover:bg-panel-2"}`}
+          className={`hairline flex cursor-pointer flex-col items-center justify-center rounded-sm bg-panel py-12 transition-colors ${drag ? "border-primary bg-accent" : "hover:bg-panel-2"}`}
         >
           <Upload className="h-8 w-8 text-primary" />
           <p className="mt-3 text-sm">
@@ -153,6 +154,17 @@ function SessionsPage() {
               e.target.value = "";
             }}
           />
+        </div>
+        <Link
+          to="/live/workbench"
+          className="hairline group flex flex-col items-center justify-center rounded-sm bg-panel py-12 text-center transition-colors hover:border-emerald-400/60 hover:bg-panel-2"
+        >
+          <Radio className="h-8 w-8 text-emerald-400 group-hover:animate-pulse" />
+          <p className="mt-3 text-sm">Go Live</p>
+          <p className="mt-1 max-w-[16rem] text-[11px] text-muted-foreground">
+            Stream from the iRacing bridge into the workbench in real time
+          </p>
+        </Link>
         </div>
 
         {/* Sessions grid */}

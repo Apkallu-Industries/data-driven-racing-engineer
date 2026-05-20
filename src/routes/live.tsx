@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/lib/auth";
@@ -68,6 +68,14 @@ function LivePage() {
 
   const groupOf = (name: string) => catalogEntry(name)?.group ?? "Other";
 
+  // Detect the https-page → ws:// mixed-content block. The bridge itself
+  // is fine, but browsers refuse to open an insecure WebSocket from a
+  // secure (HTTPS) origin and the connection dies immediately.
+  const isMixedContentBlocked =
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:" &&
+    url.startsWith("ws://");
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <AppHeader>
@@ -106,7 +114,24 @@ function LivePage() {
             )}
           </>
         )}
+        <span className="text-muted-foreground">·</span>
+        <Link
+          to="/live/workbench"
+          className="rounded-sm border border-border bg-primary px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-primary-foreground hover:opacity-90"
+        >
+          Open Workbench (Live) →
+        </Link>
       </AppHeader>
+
+      {isMixedContentBlocked && (
+        <div className="bg-amber-500/15 px-3 py-2 font-mono text-[11px] leading-relaxed text-amber-200">
+          <strong className="mr-1 font-semibold">Browser blocks ws:// from this hosted page.</strong>
+          The bridge is healthy, but secure pages can't open insecure WebSockets.
+          Run ApexTrace on the same PC as the bridge:
+          <code className="ml-1 rounded-sm bg-black/30 px-1.5 py-0.5">git clone … && npm install && npm run dev</code>
+          then open <code className="rounded-sm bg-black/30 px-1.5 py-0.5">http://localhost:5173/live</code> — that's an http origin and is allowed to talk to <code className="rounded-sm bg-black/30 px-1.5 py-0.5">ws://localhost:3001</code>.
+        </div>
+      )}
 
       <div className="hairline-b flex items-center gap-2 bg-panel px-3 py-2">
         <input

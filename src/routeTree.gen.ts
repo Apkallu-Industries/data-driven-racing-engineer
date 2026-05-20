@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as SessionsIdRouteImport } from './routes/sessions.$id'
+import { Route as LiveWorkbenchRouteImport } from './routes/live.workbench'
 import { Route as LabLapfileRouteImport } from './routes/lab.lapfile'
 import { Route as ApiPublicOgShareTokenRouteImport } from './routes/api/public/og/share.$token'
 
@@ -60,6 +61,11 @@ const SessionsIdRoute = SessionsIdRouteImport.update({
   path: '/sessions/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LiveWorkbenchRoute = LiveWorkbenchRouteImport.update({
+  id: '/workbench',
+  path: '/workbench',
+  getParentRoute: () => LiveRoute,
+} as any)
 const LabLapfileRoute = LabLapfileRouteImport.update({
   id: '/lab/lapfile',
   path: '/lab/lapfile',
@@ -76,8 +82,9 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/lab/lapfile': typeof LabLapfileRoute
+  '/live/workbench': typeof LiveWorkbenchRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -88,8 +95,9 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/lab/lapfile': typeof LabLapfileRoute
+  '/live/workbench': typeof LiveWorkbenchRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions': typeof SessionsIndexRoute
@@ -101,8 +109,9 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/fingerprint': typeof FingerprintRoute
   '/how-it-works': typeof HowItWorksRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/lab/lapfile': typeof LabLapfileRoute
+  '/live/workbench': typeof LiveWorkbenchRoute
   '/sessions/$id': typeof SessionsIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/how-it-works'
     | '/live'
     | '/lab/lapfile'
+    | '/live/workbench'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/how-it-works'
     | '/live'
     | '/lab/lapfile'
+    | '/live/workbench'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/how-it-works'
     | '/live'
     | '/lab/lapfile'
+    | '/live/workbench'
     | '/sessions/$id'
     | '/share/$token'
     | '/sessions/'
@@ -152,7 +164,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   FingerprintRoute: typeof FingerprintRoute
   HowItWorksRoute: typeof HowItWorksRoute
-  LiveRoute: typeof LiveRoute
+  LiveRoute: typeof LiveRouteWithChildren
   LabLapfileRoute: typeof LabLapfileRoute
   SessionsIdRoute: typeof SessionsIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -218,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/live/workbench': {
+      id: '/live/workbench'
+      path: '/workbench'
+      fullPath: '/live/workbench'
+      preLoaderRoute: typeof LiveWorkbenchRouteImport
+      parentRoute: typeof LiveRoute
+    }
     '/lab/lapfile': {
       id: '/lab/lapfile'
       path: '/lab/lapfile'
@@ -235,12 +254,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface LiveRouteChildren {
+  LiveWorkbenchRoute: typeof LiveWorkbenchRoute
+}
+
+const LiveRouteChildren: LiveRouteChildren = {
+  LiveWorkbenchRoute: LiveWorkbenchRoute,
+}
+
+const LiveRouteWithChildren = LiveRoute._addFileChildren(LiveRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   FingerprintRoute: FingerprintRoute,
   HowItWorksRoute: HowItWorksRoute,
-  LiveRoute: LiveRoute,
+  LiveRoute: LiveRouteWithChildren,
   LabLapfileRoute: LabLapfileRoute,
   SessionsIdRoute: SessionsIdRoute,
   ShareTokenRoute: ShareTokenRoute,
@@ -250,12 +279,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
