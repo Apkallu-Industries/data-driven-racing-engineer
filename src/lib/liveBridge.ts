@@ -321,7 +321,7 @@ function normalizeFrame(msg: unknown): {
 
   // Per-channel event shape.
   if (typeof m.name === "string" && typeof m.value === "number") {
-    return { values: { [m.name]: m.value }, sessionTime: null, lap: null };
+    return { values: { [aliasChannel(m.name)]: m.value }, sessionTime: null, lap: null };
   }
 
   const candidate =
@@ -330,12 +330,13 @@ function normalizeFrame(msg: unknown): {
     (m.data && typeof m.data === "object" && (m.data as Record<string, unknown>)) ||
     m;
 
-  const values: LiveValues = {};
+  const rawValues: LiveValues = {};
   for (const [k, v] of Object.entries(candidate)) {
-    if (typeof v === "number" && Number.isFinite(v)) values[k] = v;
-    else if (typeof v === "boolean") values[k] = v ? 1 : 0;
+    if (typeof v === "number" && Number.isFinite(v)) rawValues[k] = v;
+    else if (typeof v === "boolean") rawValues[k] = v ? 1 : 0;
   }
-  if (Object.keys(values).length === 0) return null;
+  if (Object.keys(rawValues).length === 0) return null;
+  const values = aliasValues(rawValues);
 
   const sessionTime =
     typeof m.sessionTime === "number"
