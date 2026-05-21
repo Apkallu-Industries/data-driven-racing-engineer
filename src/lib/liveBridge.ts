@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { IbtChannel, IbtParsed } from "./ibt/types";
-import { catalogEntry } from "./ibt/channelCatalog";
+import { catalogEntry, CHANNEL_CATALOG } from "./ibt/channelCatalog";
 
 /**
  * Live bridge client.
@@ -72,6 +72,82 @@ const RAW_LOG_MAX = 25;
 
 /** Ring buffer capacity (~120s at 60Hz). */
 export const HISTORY_CAPACITY = 7200;
+
+/**
+ * Alias map: incoming live channel names → canonical .ibt names.
+ *
+ * The iRacing bridge / SDK sometimes emits keys with different casing or
+ * shorthand (e.g. "gear", "rpm", "speed", "lapCurrentLapTime") than the
+ * canonical `.ibt` channel names the widgets and catalog expect ("Gear",
+ * "RPM", "Speed", "LapCurrentLapTime"). We normalize at ingest so every
+ * downstream consumer sees one consistent vocabulary.
+ *
+ * Strategy (in order):
+ *   1. Explicit hard overrides (rare special cases / abbreviations).
+ *   2. Case-insensitive match against the curated catalog.
+ *   3. Pass through unchanged.
+ */
+const EXPLICIT_ALIASES: Record<string, string> = {
+  // Abbreviations / shorthand
+  rpm: "RPM",
+  kph: "Speed",
+  mph: "Speed",
+  velocity: "Speed",
+  gear: "Gear",
+  throttle: "Throttle",
+  brake: "Brake",
+  clutch: "Clutch",
+  steer: "SteeringWheelAngle",
+  steering: "SteeringWheelAngle",
+  steeringangle: "SteeringWheelAngle",
+  steerangle: "SteeringWheelAngle",
+  lap: "Lap",
+  lapcompleted: "LapCompleted",
+  laptime: "LapCurrentLapTime",
+  currentlaptime: "LapCurrentLapTime",
+  lastlaptime: "LapLastLapTime",
+  bestlaptime: "LapBestLapTime",
+  fuel: "FuelLevel",
+  fuellevel: "FuelLevel",
+  fuelpct: "FuelLevelPct",
+  sessiontime: "SessionTime",
+  time: "SessionTime",
+  lat: "Lat",
+  latitude: "Lat",
+  lon: "Lon",
+  lng: "Lon",
+  longitude: "Lon",
+  // Common per-corner casing differences
+  lapdist: "LapDist",
+  lapdistpct: "LapDistPct",
+};
+
+/** Lowercased canonical name → canonical name (built once from catalog). */
+const CASE_INSENSITIVE_ALIAS: Map<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const c of CHANNEL_CATALOG) m.set(c.name.toLowerCase(), c.name);
+  return m;
+})();
+
+/** Resolve a raw incoming channel key to its canonical `.ibt` name. */
+export function aliasChannel(raw: string): string {
+  if (!raw) return raw;
+  const lower = raw.toLowerCase();
+  const explicit = EXPLICIT_ALIASES[lower];
+  if (explicit) return explicit;
+  const cataloged = CASE_INSENSITIVE_ALIAS.get(lower);
+  if (cataloged) return cataloged;
+  return raw;
+}
+
+/** Apply aliasChannel to every key of a values bag. Later keys win on collision. */
+function aliasValues(values: LiveValues): LiveValues {
+  const out: LiveValues = {};
+  for (const [k, v] of Object.entries(values)) {
+    out[aliasChannel(k)] = v;
+  }
+  return out;
+}
 
 /** Per-channel ring buffers — kept outside Zustand state to avoid re-renders on every frame. */
 const HISTORY: Map<string, ChannelRing> = new Map();
@@ -245,7 +321,7 @@ function normalizeFrame(msg: unknown): {
 
   // Per-channel event shape.
   if (typeof m.name === "string" && typeof m.value === "number") {
-    return { values: { [m.name]: m.value }, sessionTime: null, lap: null };
+    return { values: { [aliasChannel(m.name)]: m.value }, sessionTime: null, lap: null };
   }
 
   const candidate =
@@ -254,12 +330,13 @@ function normalizeFrame(msg: unknown): {
     (m.data && typeof m.data === "object" && (m.data as Record<string, unknown>)) ||
     m;
 
-  const values: LiveValues = {};
+  const rawValues: LiveValues = {};
   for (const [k, v] of Object.entries(candidate)) {
-    if (typeof v === "number" && Number.isFinite(v)) values[k] = v;
-    else if (typeof v === "boolean") values[k] = v ? 1 : 0;
+    if (typeof v === "number" && Number.isFinite(v)) rawValues[k] = v;
+    else if (typeof v === "boolean") rawValues[k] = v ? 1 : 0;
   }
-  if (Object.keys(values).length === 0) return null;
+  if (Object.keys(rawValues).length === 0) return null;
+  const values = aliasValues(rawValues);
 
   const sessionTime =
     typeof m.sessionTime === "number"
